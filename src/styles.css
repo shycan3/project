@@ -298,6 +298,13 @@ input:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.metric-card small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .tone-green .metric-icon {
   color: var(--green);
   background: var(--green-soft);
@@ -414,6 +421,12 @@ input:focus-visible {
   color: var(--text);
   background: #f9fbfc;
   border-color: var(--line);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .compact {
@@ -844,6 +857,54 @@ input:focus-visible {
   color: var(--yellow);
 }
 
+.contest-fit-panel {
+  border: 1px solid #c7d8eb;
+  border-radius: 8px;
+  padding: 14px;
+  background: #f7faff;
+}
+
+.contest-fit-panel h3 {
+  margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--blue);
+  font-size: 15px;
+}
+
+.contest-fit-panel > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.contest-fit-panel > div > div {
+  min-height: 58px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  background: #ffffff;
+}
+
+.contest-fit-panel span,
+.contest-fit-panel strong {
+  display: block;
+}
+
+.contest-fit-panel span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.contest-fit-panel strong {
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .document-strip {
   border-top: 1px solid var(--line);
   padding-top: 14px;
@@ -1242,6 +1303,21 @@ input:focus-visible {
   margin: 0;
 }
 
+.manual-contest-form {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: minmax(160px, 1.1fr) minmax(140px, 0.8fr) minmax(200px, 1.4fr) auto;
+  align-items: end;
+  gap: 12px;
+  background: #fbfcfd;
+}
+
+.manual-contest-form .primary-button {
+  min-height: 44px;
+}
+
 .source-meter .mini-track {
   margin-top: 8px;
 }
@@ -1491,6 +1567,7 @@ input:focus-visible {
   .saved-grid,
   .form-grid,
   .detail-grid,
+  .contest-fit-panel > div,
   .region-picker {
     grid-template-columns: 1fr;
   }
@@ -1500,6 +1577,10 @@ input:focus-visible {
   }
 
   .source-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-contest-form {
     grid-template-columns: 1fr;
   }
 }

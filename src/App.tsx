@@ -29,7 +29,7 @@ import {
 
 type ViewKey = "dashboard" | "recommendations" | "saved" | "profile" | "admin";
 type MatchStatus = "지원가능" | "조건부가능" | "확인필요" | "지원불가";
-type Category = "전체" | "장학금" | "생활비" | "주거비" | "교육/연수";
+type Category = "전체" | "장학금" | "생활비" | "주거비" | "교육/연수" | "공모전";
 
 type Opportunity = {
   id: string;
@@ -52,6 +52,12 @@ type Opportunity = {
   warnings: string[];
   documents: string[];
   source: string;
+  contestFields?: string[];
+  submissionTypes?: string[];
+  teamMode?: string;
+  difficulty?: string;
+  portfolioValue?: string;
+  prizeText?: string;
 };
 
 type ExtractionItem = {
@@ -73,7 +79,7 @@ type AuditLog = {
 type SourceItem = {
   id: string;
   name: string;
-  type: "API" | "HTML";
+  type: "API" | "HTML" | "MANUAL";
   organization: string;
   url: string;
   status: "ACTIVE" | "NEEDS_KEY" | "BROKEN" | "PAUSED";
@@ -127,7 +133,18 @@ type Profile = {
   residenceMonths: string;
   benefitPreference: string;
   specialConditions: string[];
+  contestInterests: string[];
+  skills: string[];
+  teamPreference: string;
+  weeklyHours: string;
+  contestGoal: string;
   completion: number;
+};
+
+type ManualContestDraft = {
+  title: string;
+  organization: string;
+  url: string;
 };
 
 const initialProfile: Profile = {
@@ -142,8 +159,32 @@ const initialProfile: Profile = {
   residenceMonths: "6개월 이상",
   benefitPreference: "생활비/주거비 우선",
   specialConditions: ["지역인재", "소득연계 관심"],
+  contestInterests: ["IT/소프트웨어", "창업/아이디어"],
+  skills: ["개발", "기획", "발표"],
+  teamPreference: "팀 가능",
+  weeklyHours: "주 5~10시간",
+  contestGoal: "포트폴리오",
   completion: 78
 };
+
+const CATEGORY_OPTIONS: Category[] = ["전체", "장학금", "생활비", "주거비", "교육/연수", "공모전"];
+
+const CONTEST_INTEREST_OPTIONS = [
+  "IT/소프트웨어",
+  "AI/데이터",
+  "창업/아이디어",
+  "기획/마케팅",
+  "디자인/브랜딩",
+  "영상/콘텐츠",
+  "글쓰기/논문",
+  "사회문제/공익",
+  "환경/에너지",
+  "금융/경제",
+  "지역/관광",
+  "게임/메타버스"
+];
+
+const SKILL_OPTIONS = ["기획", "개발", "데이터분석", "디자인", "영상편집", "글쓰기", "발표", "리서치", "마케팅", "PM", "창업 경험", "외국어"];
 
 const UNIVERSITY_OPTIONS = [
   "가야대학교",
@@ -520,7 +561,10 @@ function App() {
 
   const savedOpportunities = opportunities.filter((item) => savedIds.has(item.id));
   const actionableOpportunities = opportunities.filter((item) => item.status !== "지원불가");
-  const estimatedAmount = actionableOpportunities.reduce((sum, item) => sum + item.amountMax, 0);
+  const supportOpportunities = actionableOpportunities.filter((item) => item.category !== "공모전");
+  const contestOpportunities = actionableOpportunities.filter((item) => item.category === "공모전");
+  const estimatedAmount = supportOpportunities.reduce((sum, item) => sum + item.amountMax, 0);
+  const contestPrizePool = contestOpportunities.reduce((sum, item) => sum + item.amountMax, 0);
   const urgentCount = actionableOpportunities.filter((item) => item.dday <= 7).length;
 
   async function toggleSaved(id: string) {
@@ -602,6 +646,18 @@ function App() {
       applyBootstrap(payload);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "검수 반려 실패");
+    }
+  }
+
+  async function createContestCandidate(draft: ManualContestDraft) {
+    try {
+      const payload = await api<BootstrapPayload>("/api/admin/contest-candidates", {
+        method: "POST",
+        body: JSON.stringify(draft)
+      });
+      applyBootstrap(payload);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "공모전 등록 실패");
     }
   }
 
@@ -705,7 +761,8 @@ function App() {
             estimatedAmount={estimatedAmount}
             urgentCount={urgentCount}
             profile={profile}
-            savedCount={savedOpportunities.length}
+            contestCount={contestOpportunities.length}
+            contestPrizePool={contestPrizePool}
             onViewRecommendations={() => setActiveView("recommendations")}
             onSelectOpportunity={(id) => {
               setSelectedId(id);
@@ -743,7 +800,7 @@ function App() {
         {activeView === "profile" && <ProfileView profile={profile} onProfileChange={saveProfile} onComplete={() => setActiveView("dashboard")} />}
 
         {activeView === "admin" && (
-          <AdminView admin={admin} onApprove={approveExtraction} onReject={rejectExtraction} onRunSourceSync={runSourceSync} />
+          <AdminView admin={admin} onApprove={approveExtraction} onReject={rejectExtraction} onRunSourceSync={runSourceSync} onCreateContestCandidate={createContestCandidate} />
         )}
       </main>
     </div>
@@ -774,7 +831,8 @@ function Dashboard({
   estimatedAmount,
   urgentCount,
   profile,
-  savedCount,
+  contestCount,
+  contestPrizePool,
   onViewRecommendations,
   onSelectOpportunity
 }: {
@@ -782,7 +840,8 @@ function Dashboard({
   estimatedAmount: number;
   urgentCount: number;
   profile: Profile;
-  savedCount: number;
+  contestCount: number;
+  contestPrizePool: number;
   onViewRecommendations: () => void;
   onSelectOpportunity: (id: string) => void;
 }) {
@@ -792,9 +851,9 @@ function Dashboard({
     <div className="content-stack">
       <section className="metrics-grid" aria-label="요약 지표">
         <MetricCard icon={<Sparkles size={20} />} label="추천 가능 기회" value={`${opportunities.filter((item) => item.status !== "지원불가").length}개`} tone="green" />
-        <MetricCard icon={<BookOpenCheck size={20} />} label="예상 지원 가능 금액" value={`${currencyFormatter.format(estimatedAmount)}원`} tone="blue" />
+        <MetricCard icon={<BookOpenCheck size={20} />} label="장학/지원 예상 금액" value={`${currencyFormatter.format(estimatedAmount)}원`} tone="blue" />
         <MetricCard icon={<CalendarClock size={20} />} label="7일 내 마감" value={`${urgentCount}개`} tone="red" />
-        <MetricCard icon={<Star size={20} />} label="저장한 공고" value={`${savedCount}개`} tone="yellow" />
+        <MetricCard icon={<Star size={20} />} label="추천 공모전" value={`${contestCount}개`} tone="yellow" caption={`상금 풀 ${currencyFormatter.format(contestPrizePool)}원`} />
       </section>
 
       <section className="dashboard-grid">
@@ -873,18 +932,21 @@ function MetricCard({
   icon,
   label,
   value,
-  tone
+  tone,
+  caption
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   tone: "green" | "blue" | "red" | "yellow";
+  caption?: string;
 }) {
   return (
     <article className={`metric-card tone-${tone}`}>
       <div className="metric-icon">{icon}</div>
       <span>{label}</span>
       <strong>{value}</strong>
+      {caption && <small>{caption}</small>}
     </article>
   );
 }
@@ -919,7 +981,7 @@ function RecommendationsView({
             <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="공고, 기관, 지역 검색" />
           </label>
           <div className="category-tabs" role="tablist" aria-label="카테고리 필터">
-            {(["전체", "장학금", "생활비", "주거비", "교육/연수"] as Category[]).map((item) => (
+            {CATEGORY_OPTIONS.map((item) => (
               <button key={item} className={category === item ? "selected" : ""} onClick={() => onCategoryChange(item)}>
                 {item}
               </button>
@@ -1032,6 +1094,8 @@ function OpportunityDetail({
         <InfoTile icon={<Building2 size={17} />} label="수집" value={opportunity.sourceType} />
         <InfoTile icon={<ShieldCheck size={17} />} label="신뢰도" value={`${Math.round(opportunity.confidence * 100)}%`} />
       </div>
+
+      {opportunity.category === "공모전" && <ContestFitPanel opportunity={opportunity} />}
 
       <ReasonSection title="추천 근거" icon={<Check size={17} />} items={opportunity.reasons} tone="positive" />
       <ReasonSection title="확인 필요" icon={<Info size={17} />} items={opportunity.unknowns} tone="neutral" />
@@ -1210,6 +1274,36 @@ function ProfileView({
             options={["지역인재", "소득연계 관심", "다문화가정", "보훈/국가유공", "장애학생", "농어촌", "창업/IT", "멘토링 가능"]}
             onChange={(values) => updateProfile("specialConditions", values)}
           />
+          <MultiChoiceField
+            label="공모전 관심 분야"
+            values={profile.contestInterests}
+            options={CONTEST_INTEREST_OPTIONS}
+            onChange={(values) => updateProfile("contestInterests", values)}
+          />
+          <MultiChoiceField
+            label="공모전 보유 역량"
+            values={profile.skills}
+            options={SKILL_OPTIONS}
+            onChange={(values) => updateProfile("skills", values)}
+          />
+          <ChoiceField
+            label="팀 참여"
+            value={profile.teamPreference}
+            options={["개인 선호", "팀 가능", "팀 선호", "팀원 찾는 중"]}
+            onChange={(value) => updateProfile("teamPreference", value)}
+          />
+          <ChoiceField
+            label="주당 투자 가능 시간"
+            value={profile.weeklyHours}
+            options={["주 3시간 이하", "주 3~5시간", "주 5~10시간", "주 10시간 이상", "아직 모름"]}
+            onChange={(value) => updateProfile("weeklyHours", value)}
+          />
+          <ChoiceField
+            label="공모전 목표"
+            value={profile.contestGoal}
+            options={["상금", "포트폴리오", "취업/인턴", "창업 검증", "수상 경력", "경험 쌓기"]}
+            onChange={(value) => updateProfile("contestGoal", value)}
+          />
         </div>
 
         <div className="profile-actions">
@@ -1234,6 +1328,8 @@ function ProfileView({
           <ImprovementItem label="중복수혜 여부" detail="등록금성 장학금 경고" />
           <ImprovementItem label="활동 가능 시간" detail="멘토링/근로성 장학금" />
           <ImprovementItem label="우대조건" detail="선택 입력, 건너뛰기 가능" />
+          <ImprovementItem label="공모전 관심 분야" detail="분야/제출물 기반 추천" done={profile.contestInterests.length > 0} />
+          <ImprovementItem label="팀 참여 성향" detail="개인/팀 공모전 필터링" done={Boolean(profile.teamPreference)} />
         </div>
       </section>
     </div>
@@ -1419,13 +1515,30 @@ function AdminView({
   admin,
   onApprove,
   onReject,
-  onRunSourceSync
+  onRunSourceSync,
+  onCreateContestCandidate
 }: {
   admin: AdminData;
   onApprove: (id: string) => Promise<void>;
   onReject: (id: string) => Promise<void>;
   onRunSourceSync: (sourceId?: string) => Promise<void>;
+  onCreateContestCandidate: (draft: ManualContestDraft) => Promise<void>;
 }) {
+  const [contestDraft, setContestDraft] = useState<ManualContestDraft>({
+    title: "",
+    organization: "",
+    url: ""
+  });
+  const canSubmitContest = contestDraft.title.trim().length >= 4;
+
+  async function submitContestDraft() {
+    if (!canSubmitContest) {
+      return;
+    }
+    await onCreateContestCandidate(contestDraft);
+    setContestDraft({ title: "", organization: "", url: "" });
+  }
+
   return (
     <div className="admin-layout">
       <section className="metrics-grid">
@@ -1452,7 +1565,7 @@ function AdminView({
               <div className="source-card-head">
                 <div>
                   <strong>{source.name}</strong>
-                  <span>{source.organization} · {source.type}</span>
+                  <span>{source.organization} · {sourceTypeLabel(source.type)}</span>
                 </div>
                 <SourceStatusBadge status={source.status} />
               </div>
@@ -1476,6 +1589,31 @@ function AdminView({
             </article>
           ))}
         </div>
+      </section>
+
+      <section className="review-panel">
+        <div className="section-heading">
+          <div>
+            <p>공모전 등록</p>
+            <h2>공식 URL 검수 큐</h2>
+          </div>
+          <Sparkles size={22} />
+        </div>
+        <form
+          className="manual-contest-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void submitContestDraft();
+          }}
+        >
+          <TextField label="공모전명" value={contestDraft.title} onChange={(value) => setContestDraft((current) => ({ ...current, title: value }))} />
+          <TextField label="주최/기관" value={contestDraft.organization} onChange={(value) => setContestDraft((current) => ({ ...current, organization: value }))} />
+          <TextField label="공식 원문 URL" value={contestDraft.url} onChange={(value) => setContestDraft((current) => ({ ...current, url: value }))} />
+          <button className="primary-button" type="submit" disabled={!canSubmitContest}>
+            <ClipboardCheck size={18} />
+            검수 큐 등록
+          </button>
+        </form>
       </section>
 
       <section className="review-panel">
@@ -1579,6 +1717,15 @@ function SourceStatusBadge({ status }: { status: SourceItem["status"] }) {
   return <span className={`source-status source-${status}`}>{labels[status]}</span>;
 }
 
+function sourceTypeLabel(type: SourceItem["type"]) {
+  const labels: Record<SourceItem["type"], string> = {
+    API: "공식 API",
+    HTML: "공개 HTML",
+    MANUAL: "수동 검수"
+  };
+  return labels[type];
+}
+
 function ReasonSection({
   title,
   icon,
@@ -1619,6 +1766,34 @@ function InfoTile({ icon, label, value }: { icon: React.ReactNode; label: string
   );
 }
 
+function ContestFitPanel({ opportunity }: { opportunity: Opportunity }) {
+  const rows = [
+    { label: "분야", value: opportunity.contestFields?.join(", ") || "기관 확인" },
+    { label: "제출물", value: opportunity.submissionTypes?.join(", ") || "공고 확인" },
+    { label: "참여 방식", value: opportunity.teamMode || "공고 확인" },
+    { label: "난이도", value: opportunity.difficulty || "중간" },
+    { label: "포트폴리오", value: opportunity.portfolioValue || "중간" },
+    { label: "시상/혜택", value: opportunity.prizeText || opportunity.amountText }
+  ];
+
+  return (
+    <section className="contest-fit-panel">
+      <h3>
+        <Sparkles size={17} />
+        공모전 적합도
+      </h3>
+      <div>
+        {rows.map((row) => (
+          <div key={row.label}>
+            <span>{row.label}</span>
+            <strong>{row.value}</strong>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function TextField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   return (
     <label className="text-field">
@@ -1645,7 +1820,8 @@ function CoverageRows() {
     { label: "대학 장학공지", value: 68 },
     { label: "지자체 장학재단", value: 54 },
     { label: "민간재단 PDF", value: 39 },
-    { label: "청년정책 API", value: 82 }
+    { label: "청년정책 API", value: 82 },
+    { label: "공모전 공식/수동 검수", value: 35 }
   ];
 
   return (
