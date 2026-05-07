@@ -48,11 +48,11 @@ async function route(req, res) {
   if (method === "PATCH" && url.pathname === "/api/me/profile") {
     const body = await readBody(req);
     const db = await readDb();
-    db.profile = {
+    db.profile = normalizeProfile({
       ...db.profile,
       ...body,
       completion: calculateCompletion({ ...db.profile, ...body })
-    };
+    });
     db.auditLogs.unshift(audit("PROFILE_UPDATED", { fields: Object.keys(body) }));
     await writeDb(db);
     return sendJson(res, 200, buildBootstrap(db));
@@ -494,6 +494,30 @@ function calculateCompletion(profile) {
   return Math.max(20, Math.round((filled / fields.length) * 92));
 }
 
+function normalizeProfile(profile) {
+  return {
+    ...profile,
+    grade: normalizeGrade(profile.grade)
+  };
+}
+
+function normalizeGrade(grade) {
+  const text = String(grade ?? "");
+  if (text.includes("1학년")) {
+    return "1학년";
+  }
+  if (text.includes("2학년")) {
+    return "2학년";
+  }
+  if (text.includes("3학년")) {
+    return "3학년";
+  }
+  if (text.includes("4학년")) {
+    return "4학년";
+  }
+  return text || "1학년";
+}
+
 function calculateAutoApprovalRate(db) {
   const total = db.extractionQueue.length;
   if (total === 0) {
@@ -620,12 +644,14 @@ async function writeDb(db) {
 }
 
 function normalizeDb(db) {
+  const profile = normalizeProfile({
+    ...seedData.profile,
+    ...db.profile
+  });
+
   return {
     ...db,
-    profile: {
-      ...seedData.profile,
-      ...db.profile
-    },
+    profile,
     sources: db.sources ?? seedData.sources,
     crawlRuns: db.crawlRuns ?? [],
     opportunities: db.opportunities ?? seedData.opportunities,

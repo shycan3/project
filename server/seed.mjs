@@ -2,7 +2,7 @@ export const seedData = {
   profile: {
     school: "한국대학교",
     status: "재학",
-    grade: "3학년 1학기",
+    grade: "3학년",
     major: "컴퓨터공학과",
     residence: "서울특별시 마포구",
     hometown: "충청남도 천안시",

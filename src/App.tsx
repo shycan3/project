@@ -133,7 +133,7 @@ type Profile = {
 const initialProfile: Profile = {
   school: "한국대학교",
   status: "재학",
-  grade: "3학년 1학기",
+  grade: "3학년",
   major: "컴퓨터공학과",
   residence: "서울특별시 마포구",
   hometown: "충청남도 천안시",
@@ -428,6 +428,29 @@ function toCheckedDocSets(checkedDocs: Record<string, string[]>) {
   return Object.fromEntries(Object.entries(checkedDocs).map(([key, value]) => [key, new Set(value)])) as Record<string, Set<string>>;
 }
 
+function normalizeProfileForUi(profile: Profile): Profile {
+  return {
+    ...profile,
+    grade: normalizeGrade(profile.grade)
+  };
+}
+
+function normalizeGrade(grade: string) {
+  if (grade.includes("1학년")) {
+    return "1학년";
+  }
+  if (grade.includes("2학년")) {
+    return "2학년";
+  }
+  if (grade.includes("3학년")) {
+    return "3학년";
+  }
+  if (grade.includes("4학년")) {
+    return "4학년";
+  }
+  return grade || "1학년";
+}
+
 function App() {
   const [activeView, setActiveView] = useState<ViewKey>("profile");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -443,7 +466,7 @@ function App() {
   const [errorMessage, setErrorMessage] = useState("");
 
   function applyBootstrap(payload: BootstrapPayload) {
-    setProfile(payload.profile);
+    setProfile(normalizeProfileForUi(payload.profile));
     setOpportunities(payload.opportunities);
     setSavedIds(new Set(payload.savedOpportunityIds));
     setCheckedDocs(toCheckedDocSets(payload.checkedDocs));
@@ -551,11 +574,12 @@ function App() {
   }
 
   async function saveProfile(nextProfile: Profile) {
-    setProfile(nextProfile);
+    const normalizedProfile = normalizeProfileForUi(nextProfile);
+    setProfile(normalizedProfile);
     try {
       const payload = await api<BootstrapPayload>("/api/me/profile", {
         method: "PATCH",
-        body: JSON.stringify(nextProfile)
+        body: JSON.stringify(normalizedProfile)
       });
       applyBootstrap(payload);
     } catch (error) {
@@ -1132,9 +1156,9 @@ function ProfileView({
             onChange={(value) => updateProfile("status", value)}
           />
           <ChoiceField
-            label="학년/학기"
+            label="학년"
             value={profile.grade}
-            options={["1학년 1학기", "1학년 2학기", "2학년 1학기", "2학년 2학기", "3학년 1학기", "3학년 2학기", "4학년 1학기", "4학년 2학기", "4학년 이상"]}
+            options={["1학년", "2학년", "3학년", "4학년"]}
             onChange={(value) => updateProfile("grade", value)}
           />
           <ScrollSelectField
