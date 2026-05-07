@@ -145,6 +145,256 @@ const initialProfile: Profile = {
   completion: 78
 };
 
+const UNIVERSITY_OPTIONS = [
+  "가야대학교",
+  "가천대학교",
+  "가톨릭관동대학교",
+  "가톨릭대학교",
+  "감리교신학대학교",
+  "강남대학교",
+  "강릉원주대학교",
+  "강서대학교",
+  "강원대학교",
+  "건국대학교",
+  "건국대학교 글로컬캠퍼스",
+  "건양대학교",
+  "경기대학교",
+  "경남대학교",
+  "경동대학교",
+  "경북대학교",
+  "경상국립대학교",
+  "경성대학교",
+  "경운대학교",
+  "경일대학교",
+  "경희대학교",
+  "계명대학교",
+  "고려대학교",
+  "고려대학교 세종캠퍼스",
+  "고신대학교",
+  "공주대학교",
+  "광운대학교",
+  "광주대학교",
+  "광주여자대학교",
+  "국민대학교",
+  "군산대학교",
+  "극동대학교",
+  "금오공과대학교",
+  "김천대학교",
+  "나사렛대학교",
+  "남서울대학교",
+  "단국대학교",
+  "대구가톨릭대학교",
+  "대구대학교",
+  "대구한의대학교",
+  "대전대학교",
+  "대진대학교",
+  "덕성여자대학교",
+  "동국대학교",
+  "동국대학교 WISE캠퍼스",
+  "동덕여자대학교",
+  "동명대학교",
+  "동서대학교",
+  "동아대학교",
+  "동양대학교",
+  "동의대학교",
+  "루터대학교",
+  "명지대학교",
+  "목원대학교",
+  "목포대학교",
+  "배재대학교",
+  "백석대학교",
+  "부경대학교",
+  "부산가톨릭대학교",
+  "부산대학교",
+  "부산외국어대학교",
+  "삼육대학교",
+  "상명대학교",
+  "상지대학교",
+  "서강대학교",
+  "서경대학교",
+  "서울과학기술대학교",
+  "서울교육대학교",
+  "서울대학교",
+  "서울시립대학교",
+  "서울신학대학교",
+  "서울여자대학교",
+  "서원대학교",
+  "선문대학교",
+  "성결대학교",
+  "성공회대학교",
+  "성균관대학교",
+  "성신여자대학교",
+  "세명대학교",
+  "세종대학교",
+  "수원대학교",
+  "숙명여자대학교",
+  "순천대학교",
+  "순천향대학교",
+  "숭실대학교",
+  "신라대학교",
+  "아주대학교",
+  "안동대학교",
+  "안양대학교",
+  "연세대학교",
+  "연세대학교 미래캠퍼스",
+  "영남대학교",
+  "우석대학교",
+  "우송대학교",
+  "울산대학교",
+  "원광대학교",
+  "이화여자대학교",
+  "인제대학교",
+  "인천대학교",
+  "인하대학교",
+  "전남대학교",
+  "전북대학교",
+  "제주대학교",
+  "조선대학교",
+  "중앙대학교",
+  "차의과학대학교",
+  "창원대학교",
+  "청주대학교",
+  "충남대학교",
+  "충북대학교",
+  "한국공학대학교",
+  "한국교원대학교",
+  "한국교통대학교",
+  "한국기술교육대학교",
+  "한국외국어대학교",
+  "한국체육대학교",
+  "한국항공대학교",
+  "한남대학교",
+  "한동대학교",
+  "한라대학교",
+  "한림대학교",
+  "한밭대학교",
+  "한서대학교",
+  "한성대학교",
+  "한세대학교",
+  "한신대학교",
+  "한양대학교",
+  "한양대학교 ERICA",
+  "협성대학교",
+  "호서대학교",
+  "홍익대학교"
+].sort((a, b) => a.localeCompare(b, "ko"));
+
+const MAJOR_OPTIONS = [
+  "AI학과",
+  "간호학과",
+  "건축공학과",
+  "건축학과",
+  "게임공학과",
+  "경영정보학과",
+  "경영학과",
+  "경제학과",
+  "경찰행정학과",
+  "광고홍보학과",
+  "관광경영학과",
+  "교육학과",
+  "국어국문학과",
+  "국제통상학과",
+  "글로벌비즈니스학과",
+  "기계공학과",
+  "기독교학과",
+  "농업경제학과",
+  "도시공학과",
+  "동물자원학과",
+  "디자인학과",
+  "디지털미디어학과",
+  "무역학과",
+  "문예창작학과",
+  "문화콘텐츠학과",
+  "물리학과",
+  "미디어커뮤니케이션학과",
+  "미술학과",
+  "바이오메디컬공학과",
+  "반도체공학과",
+  "법학과",
+  "보건행정학과",
+  "부동산학과",
+  "불어불문학과",
+  "빅데이터학과",
+  "사학과",
+  "사회복지학과",
+  "사회학과",
+  "산업공학과",
+  "상담심리학과",
+  "생명공학과",
+  "생명과학과",
+  "서양화과",
+  "섬유공학과",
+  "소프트웨어학과",
+  "소방방재학과",
+  "수의학과",
+  "수학과",
+  "스마트팜학과",
+  "스포츠과학과",
+  "시각디자인학과",
+  "식품공학과",
+  "식품영양학과",
+  "신소재공학과",
+  "심리학과",
+  "약학과",
+  "언론정보학과",
+  "에너지공학과",
+  "역사교육과",
+  "영어교육과",
+  "영어영문학과",
+  "유아교육과",
+  "음악학과",
+  "응급구조학과",
+  "의공학과",
+  "의류학과",
+  "의예과",
+  "일본학과",
+  "자동차공학과",
+  "전공무관",
+  "전기공학과",
+  "전자공학과",
+  "정보보호학과",
+  "정치외교학과",
+  "조경학과",
+  "중국학과",
+  "지리학과",
+  "철학과",
+  "체육교육과",
+  "초등교육과",
+  "컴퓨터공학과",
+  "토목공학과",
+  "통계학과",
+  "패션디자인학과",
+  "항공서비스학과",
+  "항공우주공학과",
+  "해양공학과",
+  "행정학과",
+  "호텔경영학과",
+  "화학공학과",
+  "화학과",
+  "환경공학과",
+  "회계학과"
+].sort((a, b) => a.localeCompare(b, "ko"));
+
+const REGION_GROUPS: Record<string, string[]> = {
+  "강원특별자치도": ["강릉시", "동해시", "삼척시", "속초시", "원주시", "춘천시", "태백시", "고성군", "양구군", "양양군", "영월군", "인제군", "정선군", "철원군", "평창군", "홍천군", "화천군", "횡성군"],
+  "경기도": ["수원시", "성남시", "고양시", "용인시", "부천시", "안산시", "안양시", "남양주시", "화성시", "평택시", "의정부시", "시흥시", "파주시", "김포시", "광명시", "광주시", "군포시", "하남시", "오산시", "양주시", "이천시", "구리시", "안성시", "포천시", "의왕시", "여주시", "동두천시", "과천시", "가평군", "양평군", "연천군"],
+  "경상남도": ["거제시", "김해시", "밀양시", "사천시", "양산시", "진주시", "창원시", "통영시", "거창군", "고성군", "남해군", "산청군", "의령군", "창녕군", "하동군", "함안군", "함양군", "합천군"],
+  "경상북도": ["경산시", "경주시", "구미시", "김천시", "문경시", "상주시", "안동시", "영주시", "영천시", "포항시", "고령군", "봉화군", "성주군", "영덕군", "영양군", "예천군", "울릉군", "울진군", "의성군", "청도군", "청송군", "칠곡군"],
+  "광주광역시": ["광산구", "남구", "동구", "북구", "서구"],
+  "대구광역시": ["군위군", "남구", "달서구", "달성군", "동구", "북구", "서구", "수성구", "중구"],
+  "대전광역시": ["대덕구", "동구", "서구", "유성구", "중구"],
+  "부산광역시": ["강서구", "금정구", "기장군", "남구", "동구", "동래구", "부산진구", "북구", "사상구", "사하구", "서구", "수영구", "연제구", "영도구", "중구", "해운대구"],
+  "서울특별시": ["강남구", "강동구", "강북구", "강서구", "관악구", "광진구", "구로구", "금천구", "노원구", "도봉구", "동대문구", "동작구", "마포구", "서대문구", "서초구", "성동구", "성북구", "송파구", "양천구", "영등포구", "용산구", "은평구", "종로구", "중구", "중랑구"],
+  "세종특별자치시": ["세종특별자치시"],
+  "울산광역시": ["남구", "동구", "북구", "울주군", "중구"],
+  "인천광역시": ["강화군", "계양구", "남동구", "동구", "미추홀구", "부평구", "서구", "연수구", "옹진군", "중구"],
+  "전라남도": ["광양시", "나주시", "목포시", "순천시", "여수시", "강진군", "고흥군", "곡성군", "구례군", "담양군", "무안군", "보성군", "신안군", "영광군", "영암군", "완도군", "장성군", "장흥군", "진도군", "함평군", "해남군", "화순군"],
+  "전북특별자치도": ["군산시", "김제시", "남원시", "익산시", "전주시", "정읍시", "고창군", "무주군", "부안군", "순창군", "완주군", "임실군", "장수군", "진안군"],
+  "제주특별자치도": ["서귀포시", "제주시"],
+  "충청남도": ["계룡시", "공주시", "논산시", "당진시", "보령시", "서산시", "아산시", "천안시", "금산군", "부여군", "서천군", "예산군", "청양군", "태안군", "홍성군"],
+  "충청북도": ["제천시", "청주시", "충주시", "괴산군", "단양군", "보은군", "영동군", "옥천군", "음성군", "증평군", "진천군"]
+};
+
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
 
 const emptyAdmin: AdminData = {
@@ -179,7 +429,7 @@ function toCheckedDocSets(checkedDocs: Record<string, string[]>) {
 }
 
 function App() {
-  const [activeView, setActiveView] = useState<ViewKey>("dashboard");
+  const [activeView, setActiveView] = useState<ViewKey>("profile");
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<Category>("전체");
@@ -466,7 +716,7 @@ function App() {
           />
         )}
 
-        {activeView === "profile" && <ProfileView profile={profile} onProfileChange={saveProfile} />}
+        {activeView === "profile" && <ProfileView profile={profile} onProfileChange={saveProfile} onComplete={() => setActiveView("dashboard")} />}
 
         {activeView === "admin" && (
           <AdminView admin={admin} onApprove={approveExtraction} onReject={rejectExtraction} onRunSourceSync={runSourceSync} />
@@ -845,10 +1095,12 @@ function SavedView({
 
 function ProfileView({
   profile,
-  onProfileChange
+  onProfileChange,
+  onComplete
 }: {
   profile: Profile;
   onProfileChange: (profile: Profile) => void | Promise<void>;
+  onComplete: () => void;
 }) {
   function updateProfile<K extends keyof Profile>(key: K, value: Profile[K]) {
     void onProfileChange({ ...profile, [key]: value, completion: Math.min(92, profile.completion + 1) });
@@ -866,10 +1118,11 @@ function ProfileView({
         </div>
 
         <div className="form-grid">
-          <ChoiceField
+          <ScrollSelectField
             label="학교"
             value={profile.school}
-            options={["한국대학교", "서울시립대학교", "부산대학교", "충남대학교", "강원대학교"]}
+            options={UNIVERSITY_OPTIONS}
+            placeholder="대학교 이름 검색"
             onChange={(value) => updateProfile("school", value)}
           />
           <ChoiceField
@@ -881,25 +1134,26 @@ function ProfileView({
           <ChoiceField
             label="학년/학기"
             value={profile.grade}
-            options={["1학년 1학기", "1학년 2학기", "2학년", "3학년 1학기", "3학년 2학기", "4학년 이상"]}
+            options={["1학년 1학기", "1학년 2학기", "2학년 1학기", "2학년 2학기", "3학년 1학기", "3학년 2학기", "4학년 1학기", "4학년 2학기", "4학년 이상"]}
             onChange={(value) => updateProfile("grade", value)}
           />
-          <ChoiceField
+          <ScrollSelectField
             label="전공"
             value={profile.major}
-            options={["컴퓨터공학과", "경영학과", "간호학과", "사회복지학과", "디자인학과", "전공무관"]}
+            options={MAJOR_OPTIONS}
+            placeholder="전공/학과명 검색"
             onChange={(value) => updateProfile("major", value)}
           />
-          <ChoiceField
+          <RegionField
             label="현재 거주지"
             value={profile.residence}
-            options={["서울특별시 마포구", "서울특별시 은평구", "충청남도 천안시", "충청남도 아산시", "부산광역시 해운대구"]}
+            allowNone={false}
             onChange={(value) => updateProfile("residence", value)}
           />
-          <ChoiceField
+          <RegionField
             label="출신지역"
             value={profile.hometown}
-            options={["서울특별시", "충청남도 천안시", "충청남도 아산시", "전라남도", "강원특별자치도", "해당 없음"]}
+            allowNone
             onChange={(value) => updateProfile("hometown", value)}
           />
           <ChoiceField
@@ -932,6 +1186,14 @@ function ProfileView({
             options={["지역인재", "소득연계 관심", "다문화가정", "보훈/국가유공", "장애학생", "농어촌", "창업/IT", "멘토링 가능"]}
             onChange={(values) => updateProfile("specialConditions", values)}
           />
+        </div>
+
+        <div className="profile-actions">
+          <button className="primary-button" onClick={onComplete}>
+            <Sparkles size={18} />
+            내 추천 확인
+          </button>
+          <span>선택한 조건은 바로 저장되고 추천엔진에 반영됩니다.</span>
         </div>
       </section>
 
@@ -992,6 +1254,111 @@ function MultiChoiceField({
             </button>
           );
         })}
+      </div>
+    </fieldset>
+  );
+}
+
+function ScrollSelectField({
+  label,
+  value,
+  options,
+  placeholder,
+  onChange
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  const [filter, setFilter] = useState("");
+  const normalizedOptions = options.includes(value) ? options : [value, ...options].filter(Boolean);
+  const visibleOptions = normalizedOptions.filter((option) => option.toLowerCase().includes(filter.trim().toLowerCase()));
+
+  return (
+    <fieldset className="scroll-select-field">
+      <legend>{label}</legend>
+      <div className="selected-value">
+        <span>현재 선택</span>
+        <strong>{value || "선택 필요"}</strong>
+      </div>
+      <label className="mini-search">
+        <Search size={16} />
+        <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder={placeholder} />
+      </label>
+      <div className="vertical-option-list" role="listbox" aria-label={label}>
+        {visibleOptions.map((option) => (
+          <button key={option} type="button" className={value === option ? "selected" : ""} onClick={() => onChange(option)}>
+            {option}
+          </button>
+        ))}
+        {visibleOptions.length === 0 && <p>검색 결과가 없습니다.</p>}
+      </div>
+    </fieldset>
+  );
+}
+
+function RegionField({
+  label,
+  value,
+  allowNone,
+  onChange
+}: {
+  label: string;
+  value: string;
+  allowNone: boolean;
+  onChange: (value: string) => void;
+}) {
+  const provinceOptions = Object.keys(REGION_GROUPS).sort((a, b) => a.localeCompare(b, "ko"));
+  const initialProvince = getProvinceFromRegion(value, provinceOptions) ?? provinceOptions[0];
+  const [selectedProvince, setSelectedProvince] = useState(initialProvince);
+  const cities = REGION_GROUPS[selectedProvince] ?? [];
+
+  function selectProvince(province: string) {
+    setSelectedProvince(province);
+    const firstCity = REGION_GROUPS[province]?.[0];
+    if (firstCity) {
+      onChange(formatRegion(province, firstCity));
+    }
+  }
+
+  return (
+    <fieldset className="region-field">
+      <legend>{label}</legend>
+      <div className="selected-value">
+        <span>현재 선택</span>
+        <strong>{value || "선택 필요"}</strong>
+      </div>
+      <div className="region-picker">
+        <div className="region-column">
+          <span>시·도</span>
+          <div className="vertical-option-list compact-list">
+            {allowNone && (
+              <button type="button" className={value === "해당 없음" ? "selected" : ""} onClick={() => onChange("해당 없음")}>
+                해당 없음
+              </button>
+            )}
+            {provinceOptions.map((province) => (
+              <button key={province} type="button" className={selectedProvince === province && value !== "해당 없음" ? "selected" : ""} onClick={() => selectProvince(province)}>
+                {province}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="region-column">
+          <span>시·군·구</span>
+          <div className="vertical-option-list compact-list">
+            {cities.map((city) => {
+              const region = formatRegion(selectedProvince, city);
+              return (
+                <button key={city} type="button" className={value === region ? "selected" : ""} onClick={() => onChange(region)}>
+                  {city}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </fieldset>
   );
@@ -1292,6 +1659,20 @@ function viewTitle(view: ViewKey) {
     admin: "운영 검수"
   };
   return titles[view];
+}
+
+function getProvinceFromRegion(region: string, provinces: string[]) {
+  if (!region || region === "해당 없음") {
+    return null;
+  }
+  return provinces.find((province) => region.startsWith(province)) ?? null;
+}
+
+function formatRegion(province: string, city: string) {
+  if (province === "세종특별자치시" && city === "세종특별자치시") {
+    return province;
+  }
+  return `${province} ${city}`;
 }
 
 function actionLabel(action: string) {
