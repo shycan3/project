@@ -37,6 +37,9 @@ npm run dev
 - 추천 근거/확인 필요/주의 조건 표시
 - 공고 저장/저장 해제
 - 저장 공고 신청서류 체크리스트
+- 저장 공고 신청 상태 관리: 검토중, 서류준비, 작성중, 제출완료
+- 마감 알림 on/off와 다음 행동 추천
+- 대시보드 이번 주 신청 플랜
 - 운영자 AI 추출 검수 큐
 - 운영자 실제 데이터 소스 관리
 - 공개 HTML 소스 수집 실행
@@ -56,6 +59,7 @@ PATCH  /api/me/profile
 POST   /api/recommendations/recalculate
 POST   /api/saved-opportunities
 DELETE /api/saved-opportunities/:id
+PATCH  /api/applications/:opportunityId/progress
 PATCH  /api/applications/:opportunityId/checklist
 POST   /api/admin/extractions/:id/approve
 POST   /api/admin/extractions/:id/reject
@@ -76,6 +80,16 @@ server/
 scripts/
   dev.mjs         API 서버와 Vite 동시 실행
 ```
+
+## 신청 실행 루프
+
+추천된 기회를 저장하면 `applications` 상태가 생성된다. 각 저장 공고는 다음 값을 가진다.
+
+- `status`: 검토중, 서류준비, 작성중, 제출완료
+- `reminderEnabled`: 마감 알림 설정 여부
+- `updatedAt`: 마지막 변경 시각
+
+프론트엔드는 체크된 서류와 신청 상태를 합쳐 다음 행동을 계산한다. 예를 들어 미체크 서류가 있으면 해당 서류 준비를 우선 노출하고, 서류가 모두 준비되면 신청서 작성 또는 제출물 최종 점검을 안내한다.
 
 ## 실제 수집 동작
 

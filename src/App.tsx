@@ -30,6 +30,7 @@ import {
 type ViewKey = "dashboard" | "recommendations" | "saved" | "profile" | "admin";
 type MatchStatus = "지원가능" | "조건부가능" | "확인필요" | "지원불가";
 type Category = "전체" | "장학금" | "생활비" | "주거비" | "교육/연수" | "공모전";
+type ApplicationStatus = "검토중" | "서류준비" | "작성중" | "제출완료";
 
 type Opportunity = {
   id: string;
@@ -118,6 +119,7 @@ type BootstrapPayload = {
   opportunities: Opportunity[];
   savedOpportunityIds: string[];
   checkedDocs: Record<string, string[]>;
+  applications: Record<string, ApplicationPlan>;
   admin: AdminData;
 };
 
@@ -145,6 +147,12 @@ type ManualContestDraft = {
   title: string;
   organization: string;
   url: string;
+};
+
+type ApplicationPlan = {
+  status: ApplicationStatus;
+  reminderEnabled: boolean;
+  updatedAt: string | null;
 };
 
 const initialProfile: Profile = {
@@ -437,6 +445,7 @@ const REGION_GROUPS: Record<string, string[]> = {
 };
 
 const currencyFormatter = new Intl.NumberFormat("ko-KR");
+const APPLICATION_STATUSES: ApplicationStatus[] = ["검토중", "서류준비", "작성중", "제출완료"];
 
 const emptyAdmin: AdminData = {
   todayCollected: 0,
@@ -467,6 +476,14 @@ async function api<T>(path: string, options?: RequestInit): Promise<T> {
 
 function toCheckedDocSets(checkedDocs: Record<string, string[]>) {
   return Object.fromEntries(Object.entries(checkedDocs).map(([key, value]) => [key, new Set(value)])) as Record<string, Set<string>>;
+}
+
+function defaultApplicationPlan(): ApplicationPlan {
+  return {
+    status: "검토중",
+    reminderEnabled: false,
+    updatedAt: null
+  };
 }
 
 function normalizeProfileForUi(profile: Profile): Profile {
@@ -501,6 +518,7 @@ function App() {
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [checkedDocs, setCheckedDocs] = useState<Record<string, Set<string>>>({});
+  const [applications, setApplications] = useState<Record<string, ApplicationPlan>>({});
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [admin, setAdmin] = useState<AdminData>(emptyAdmin);
   const [loading, setLoading] = useState(true);
@@ -511,6 +529,7 @@ function App() {
     setOpportunities(payload.opportunities);
     setSavedIds(new Set(payload.savedOpportunityIds));
     setCheckedDocs(toCheckedDocSets(payload.checkedDocs));
+    setApplications(payload.applications ?? {});
     setAdmin(payload.admin);
     if (!payload.opportunities.some((item) => item.id === selectedId) && payload.opportunities[0]) {
       setSelectedId(payload.opportunities[0].id);
@@ -578,6 +597,12 @@ function App() {
       }
       return next;
     });
+    if (!saved) {
+      setApplications((current) => ({
+        ...current,
+        [id]: current[id] ?? defaultApplicationPlan()
+      }));
+    }
 
     try {
       const payload = await api<BootstrapPayload>(saved ? `/api/saved-opportunities/${id}` : "/api/saved-opportunities", {
@@ -589,6 +614,35 @@ function App() {
       setErrorMessage(error instanceof Error ? error.message : "저장 상태 변경 실패");
       await loadBootstrap();
     }
+  }
+
+  async function updateApplicationProgress(opportunityId: string, patch: Partial<ApplicationPlan>) {
+    setApplications((current) => ({
+      ...current,
+      [opportunityId]: {
+        ...(current[opportunityId] ?? defaultApplicationPlan()),
+        ...patch,
+        updatedAt: new Date().toISOString()
+      }
+    }));
+
+    try {
+      const payload = await api<BootstrapPayload>(`/api/applications/${opportunityId}/progress`, {
+        method: "PATCH",
+        body: JSON.stringify(patch)
+      });
+      applyBootstrap(payload);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "신청 상태 저장 실패");
+      await loadBootstrap();
+    }
+  }
+
+  async function startApplication(opportunityId: string) {
+    if (!savedIds.has(opportunityId)) {
+      await toggleSaved(opportunityId);
+    }
+    await updateApplicationProgress(opportunityId, { status: "서류준비" });
   }
 
   async function toggleDocument(opportunityId: string, document: string) {
@@ -761,6 +815,9 @@ function App() {
             estimatedAmount={estimatedAmount}
             urgentCount={urgentCount}
             profile={profile}
+            savedIds={savedIds}
+            checkedDocs={checkedDocs}
+            applications={applications}
             contestCount={contestOpportunities.length}
             contestPrizePool={contestPrizePool}
             onViewRecommendations={() => setActiveView("recommendations")}
@@ -776,12 +833,16 @@ function App() {
             opportunities={filteredOpportunities}
             selectedOpportunity={selectedOpportunity}
             savedIds={savedIds}
+            checkedDocs={checkedDocs}
+            applications={applications}
             query={query}
             category={category}
             onQueryChange={setQuery}
             onCategoryChange={setCategory}
             onSelect={setSelectedId}
             onToggleSaved={toggleSaved}
+            onStartApplication={startApplication}
+            onUpdateApplication={updateApplicationProgress}
           />
         )}
 
@@ -789,7 +850,9 @@ function App() {
           <SavedView
             opportunities={savedOpportunities}
             checkedDocs={checkedDocs}
+            applications={applications}
             onToggleDocument={toggleDocument}
+            onUpdateApplication={updateApplicationProgress}
             onOpenOpportunity={(id) => {
               setSelectedId(id);
               setActiveView("recommendations");
@@ -831,6 +894,9 @@ function Dashboard({
   estimatedAmount,
   urgentCount,
   profile,
+  savedIds,
+  checkedDocs,
+  applications,
   contestCount,
   contestPrizePool,
   onViewRecommendations,
@@ -840,12 +906,19 @@ function Dashboard({
   estimatedAmount: number;
   urgentCount: number;
   profile: Profile;
+  savedIds: Set<string>;
+  checkedDocs: Record<string, Set<string>>;
+  applications: Record<string, ApplicationPlan>;
   contestCount: number;
   contestPrizePool: number;
   onViewRecommendations: () => void;
   onSelectOpportunity: (id: string) => void;
 }) {
   const topMatches = opportunities.filter((item) => item.status !== "지원불가").slice(0, 3);
+  const savedPlans = opportunities
+    .filter((item) => savedIds.has(item.id))
+    .sort((a, b) => a.dday - b.dday)
+    .slice(0, 3);
 
   return (
     <div className="content-stack">
@@ -923,6 +996,35 @@ function Dashboard({
           </div>
           <CoverageRows />
         </div>
+
+        <div className="panel">
+          <div className="section-heading">
+            <div>
+              <p>이번 주 실행</p>
+              <h2>신청 플랜</h2>
+            </div>
+            <ListChecks size={22} />
+          </div>
+          <div className="action-plan-list">
+            {savedPlans.map((item) => {
+              const checked = checkedDocs[item.id] ?? new Set<string>();
+              const application = applications[item.id] ?? defaultApplicationPlan();
+              return (
+                <button className="action-plan-item" key={item.id} onClick={() => onSelectOpportunity(item.id)}>
+                  <div>
+                    <strong>{item.title}</strong>
+                    <span>{nextActionLabel(item, checked, application)}</span>
+                  </div>
+                  <div>
+                    <ApplicationStatusBadge status={application.status} />
+                    <DeadlineBadge dday={item.dday} />
+                  </div>
+                </button>
+              );
+            })}
+            {savedPlans.length === 0 && <p className="muted-copy">추천 기회를 저장하면 신청 플랜이 생성됩니다.</p>}
+          </div>
+        </div>
       </section>
     </div>
   );
@@ -955,22 +1057,30 @@ function RecommendationsView({
   opportunities: visibleOpportunities,
   selectedOpportunity,
   savedIds,
+  checkedDocs,
+  applications,
   query,
   category,
   onQueryChange,
   onCategoryChange,
   onSelect,
-  onToggleSaved
+  onToggleSaved,
+  onStartApplication,
+  onUpdateApplication
 }: {
   opportunities: Opportunity[];
   selectedOpportunity: Opportunity;
   savedIds: Set<string>;
+  checkedDocs: Record<string, Set<string>>;
+  applications: Record<string, ApplicationPlan>;
   query: string;
   category: Category;
   onQueryChange: (value: string) => void;
   onCategoryChange: (value: Category) => void;
   onSelect: (id: string) => void;
   onToggleSaved: (id: string) => void;
+  onStartApplication: (id: string) => void;
+  onUpdateApplication: (id: string, patch: Partial<ApplicationPlan>) => void;
 }) {
   return (
     <div className="recommendation-layout">
@@ -1011,7 +1121,15 @@ function RecommendationsView({
         </div>
       </section>
 
-      <OpportunityDetail opportunity={selectedOpportunity} saved={savedIds.has(selectedOpportunity.id)} onToggleSaved={() => onToggleSaved(selectedOpportunity.id)} />
+      <OpportunityDetail
+        opportunity={selectedOpportunity}
+        saved={savedIds.has(selectedOpportunity.id)}
+        checkedDocs={checkedDocs[selectedOpportunity.id] ?? new Set<string>()}
+        application={applications[selectedOpportunity.id] ?? defaultApplicationPlan()}
+        onToggleSaved={() => onToggleSaved(selectedOpportunity.id)}
+        onStartApplication={() => onStartApplication(selectedOpportunity.id)}
+        onUpdateApplication={(patch) => onUpdateApplication(selectedOpportunity.id, patch)}
+      />
     </div>
   );
 }
@@ -1063,12 +1181,23 @@ function OpportunityCard({
 function OpportunityDetail({
   opportunity,
   saved,
-  onToggleSaved
+  checkedDocs,
+  application,
+  onToggleSaved,
+  onStartApplication,
+  onUpdateApplication
 }: {
   opportunity: Opportunity;
   saved: boolean;
+  checkedDocs: Set<string>;
+  application: ApplicationPlan;
   onToggleSaved: () => void;
+  onStartApplication: () => void;
+  onUpdateApplication: (patch: Partial<ApplicationPlan>) => void;
 }) {
+  const documentProgress = Math.round((checkedDocs.size / opportunity.documents.length) * 100);
+  const pendingDocuments = opportunity.documents.filter((document) => !checkedDocs.has(document));
+
   return (
     <aside className="detail-panel">
       <div className="detail-header">
@@ -1097,6 +1226,33 @@ function OpportunityDetail({
 
       {opportunity.category === "공모전" && <ContestFitPanel opportunity={opportunity} />}
 
+      <section className="application-panel">
+        <div className="application-panel-head">
+          <div>
+            <span>신청 실행</span>
+            <h3>{nextActionLabel(opportunity, checkedDocs, application)}</h3>
+          </div>
+          <ApplicationStatusBadge status={application.status} />
+        </div>
+        <div className="progress-track" aria-label={`서류 준비율 ${documentProgress}%`}>
+          <div className="progress-fill" style={{ width: `${documentProgress}%` }} />
+        </div>
+        <div className="status-control" aria-label="신청 상태">
+          {APPLICATION_STATUSES.map((status) => (
+            <button key={status} className={application.status === status ? "selected" : ""} onClick={() => onUpdateApplication({ status })}>
+              {status}
+            </button>
+          ))}
+        </div>
+        <div className="application-next">
+          <span>{pendingDocuments.length === 0 ? "필수 서류가 모두 체크되었습니다." : `남은 서류 ${pendingDocuments.length}개: ${pendingDocuments.slice(0, 2).join(", ")}`}</span>
+          <button className={application.reminderEnabled ? "selected" : ""} onClick={() => onUpdateApplication({ reminderEnabled: !application.reminderEnabled })}>
+            <Bell size={15} />
+            {application.reminderEnabled ? "알림 켜짐" : "알림 켜기"}
+          </button>
+        </div>
+      </section>
+
       <ReasonSection title="추천 근거" icon={<Check size={17} />} items={opportunity.reasons} tone="positive" />
       <ReasonSection title="확인 필요" icon={<Info size={17} />} items={opportunity.unknowns} tone="neutral" />
       <ReasonSection title="주의 조건" icon={<AlertTriangle size={17} />} items={opportunity.warnings} tone="warning" />
@@ -1111,13 +1267,13 @@ function OpportunityDetail({
       </section>
 
       <div className="detail-actions">
-        <button className="primary-button">
+        <button className="primary-button" onClick={onStartApplication}>
           <FileCheck2 size={18} />
           신청 준비
         </button>
-        <button className="secondary-button">
+        <button className="secondary-button" onClick={() => onUpdateApplication({ reminderEnabled: !application.reminderEnabled })}>
           <Bell size={18} />
-          마감 알림
+          {application.reminderEnabled ? "알림 해제" : "마감 알림"}
         </button>
       </div>
     </aside>
@@ -1127,12 +1283,16 @@ function OpportunityDetail({
 function SavedView({
   opportunities: savedOpportunities,
   checkedDocs,
+  applications,
   onToggleDocument,
+  onUpdateApplication,
   onOpenOpportunity
 }: {
   opportunities: Opportunity[];
   checkedDocs: Record<string, Set<string>>;
+  applications: Record<string, ApplicationPlan>;
   onToggleDocument: (opportunityId: string, document: string) => void;
+  onUpdateApplication: (opportunityId: string, patch: Partial<ApplicationPlan>) => void;
   onOpenOpportunity: (id: string) => void;
 }) {
   if (savedOpportunities.length === 0) {
@@ -1150,6 +1310,7 @@ function SavedView({
       {savedOpportunities.map((item) => {
         const checked = checkedDocs[item.id] ?? new Set<string>();
         const progress = Math.round((checked.size / item.documents.length) * 100);
+        const application = applications[item.id] ?? defaultApplicationPlan();
         return (
           <section className="checklist-panel" key={item.id}>
             <div className="section-heading">
@@ -1164,6 +1325,17 @@ function SavedView({
             <div className="progress-track" aria-label={`준비율 ${progress}%`}>
               <div className="progress-fill" style={{ width: `${progress}%` }} />
             </div>
+            <div className="application-summary">
+              <ApplicationStatusBadge status={application.status} />
+              <span>{nextActionLabel(item, checked, application)}</span>
+            </div>
+            <div className="status-control compact-status" aria-label={`${item.title} 신청 상태`}>
+              {APPLICATION_STATUSES.map((status) => (
+                <button key={status} className={application.status === status ? "selected" : ""} onClick={() => onUpdateApplication(item.id, { status })}>
+                  {status}
+                </button>
+              ))}
+            </div>
             <ul className="checklist">
               {item.documents.map((document) => (
                 <li key={document}>
@@ -1174,6 +1346,10 @@ function SavedView({
                 </li>
               ))}
             </ul>
+            <button className={`reminder-row ${application.reminderEnabled ? "selected" : ""}`} onClick={() => onUpdateApplication(item.id, { reminderEnabled: !application.reminderEnabled })}>
+              <Bell size={16} />
+              {application.reminderEnabled ? `D-${item.dday} 마감 알림 켜짐` : "마감 알림 켜기"}
+            </button>
           </section>
         );
       })}
@@ -1845,9 +2021,30 @@ function StatusBadge({ status }: { status: MatchStatus }) {
   return <span className={`status-badge status-${status}`}>{status}</span>;
 }
 
+function ApplicationStatusBadge({ status }: { status: ApplicationStatus }) {
+  return <span className={`application-status status-${status}`}>{status}</span>;
+}
+
 function DeadlineBadge({ dday }: { dday: number }) {
   const urgent = dday <= 7;
   return <span className={`deadline-badge ${urgent ? "urgent" : ""}`}>D-{dday}</span>;
+}
+
+function nextActionLabel(opportunity: Opportunity, checkedDocs: Set<string>, application: ApplicationPlan) {
+  if (application.status === "제출완료") {
+    return "제출 완료 기록됨";
+  }
+  const missingDocs = opportunity.documents.filter((document) => !checkedDocs.has(document));
+  if (missingDocs.length > 0) {
+    return `${missingDocs[0]} 준비`;
+  }
+  if (application.status === "작성중") {
+    return opportunity.category === "공모전" ? "제출물 최종 점검" : "신청서 최종 검토";
+  }
+  if (opportunity.dday <= 3) {
+    return "마감 임박, 오늘 제출 권장";
+  }
+  return opportunity.category === "공모전" ? "제출물 구성 시작" : "신청서 작성 시작";
 }
 
 function viewTitle(view: ViewKey) {
@@ -1881,10 +2078,12 @@ function actionLabel(action: string) {
     RECOMMENDATIONS_RECALCULATED: "추천 재계산",
     OPPORTUNITY_SAVED: "공고 저장",
     OPPORTUNITY_UNSAVED: "공고 저장 해제",
+    APPLICATION_PROGRESS_UPDATED: "신청 상태 업데이트",
     CHECKLIST_UPDATED: "체크리스트 업데이트",
     EXTRACTION_APPROVED: "AI 추출 승인",
     EXTRACTION_REJECTED: "AI 추출 반려",
-    SOURCE_RUN_SIMULATED: "수집 실행"
+    CONTEST_CANDIDATE_CREATED: "공모전 후보 등록",
+    SOURCE_RUN_COMPLETED: "수집 실행"
   };
   return labels[action] ?? action;
 }

@@ -71,6 +71,7 @@ async function route(req, res) {
     if (!db.savedOpportunityIds.includes(body.opportunityId)) {
       db.savedOpportunityIds.push(body.opportunityId);
     }
+    ensureApplication(db, body.opportunityId);
     db.auditLogs.unshift(audit("OPPORTUNITY_SAVED", { opportunityId: body.opportunityId }));
     await writeDb(db);
     return sendJson(res, 200, buildBootstrap(db));
@@ -86,11 +87,30 @@ async function route(req, res) {
     return sendJson(res, 200, buildBootstrap(db));
   }
 
+  const progressMatch = url.pathname.match(/^\/api\/applications\/([^/]+)\/progress$/);
+  if (method === "PATCH" && progressMatch) {
+    const opportunityId = decodeURIComponent(progressMatch[1]);
+    const body = await readBody(req);
+    const db = await readDb();
+    const application = ensureApplication(db, opportunityId);
+    if (typeof body.status === "string") {
+      application.status = normalizeApplicationStatus(body.status);
+    }
+    if (typeof body.reminderEnabled === "boolean") {
+      application.reminderEnabled = body.reminderEnabled;
+    }
+    application.updatedAt = new Date().toISOString();
+    db.auditLogs.unshift(audit("APPLICATION_PROGRESS_UPDATED", { opportunityId, status: application.status, reminderEnabled: application.reminderEnabled }));
+    await writeDb(db);
+    return sendJson(res, 200, buildBootstrap(db));
+  }
+
   const checklistMatch = url.pathname.match(/^\/api\/applications\/([^/]+)\/checklist$/);
   if (method === "PATCH" && checklistMatch) {
     const opportunityId = decodeURIComponent(checklistMatch[1]);
     const body = await readBody(req);
     const db = await readDb();
+    const application = ensureApplication(db, opportunityId);
     const current = new Set(db.checkedDocs[opportunityId] ?? []);
     if (body.checked) {
       current.add(body.document);
@@ -98,6 +118,7 @@ async function route(req, res) {
       current.delete(body.document);
     }
     db.checkedDocs[opportunityId] = [...current];
+    application.updatedAt = new Date().toISOString();
     db.auditLogs.unshift(audit("CHECKLIST_UPDATED", { opportunityId, document: body.document, checked: body.checked }));
     await writeDb(db);
     return sendJson(res, 200, buildBootstrap(db));
@@ -256,6 +277,7 @@ function buildBootstrap(db) {
     opportunities: recommendations,
     savedOpportunityIds: db.savedOpportunityIds,
     checkedDocs: db.checkedDocs,
+    applications: db.applications,
     admin: {
       todayCollected: 42 + db.opportunities.length,
       pendingReview: pendingExtractions.length,
@@ -267,6 +289,23 @@ function buildBootstrap(db) {
       auditLogs: db.auditLogs.slice(0, 8)
     }
   };
+}
+
+function ensureApplication(db, opportunityId) {
+  db.applications = db.applications ?? {};
+  if (!db.applications[opportunityId]) {
+    db.applications[opportunityId] = {
+      status: "검토중",
+      reminderEnabled: false,
+      updatedAt: null
+    };
+  }
+  return db.applications[opportunityId];
+}
+
+function normalizeApplicationStatus(status) {
+  const allowed = ["검토중", "서류준비", "작성중", "제출완료"];
+  return allowed.includes(status) ? status : "검토중";
 }
 
 async function runSources(db, sources) {
@@ -971,6 +1010,10 @@ function normalizeDb(db) {
     extractionQueue: db.extractionQueue ?? seedData.extractionQueue,
     savedOpportunityIds: db.savedOpportunityIds ?? [],
     checkedDocs: db.checkedDocs ?? {},
+    applications: {
+      ...(seedData.applications ?? {}),
+      ...(db.applications ?? {})
+    },
     auditLogs: db.auditLogs ?? []
   };
 }

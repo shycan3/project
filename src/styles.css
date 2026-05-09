@@ -526,6 +526,51 @@ input:focus-visible {
   border-bottom: 0;
 }
 
+.action-plan-list {
+  display: grid;
+  gap: 8px;
+}
+
+.action-plan-item {
+  width: 100%;
+  min-height: 72px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  background: #fbfcfd;
+  text-align: left;
+}
+
+.action-plan-item:hover {
+  border-color: #8db2dd;
+}
+
+.action-plan-item strong,
+.action-plan-item span {
+  display: block;
+}
+
+.action-plan-item strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.action-plan-item span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.action-plan-item > div:last-child {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+}
+
 .mini-track {
   height: 7px;
   margin-top: 8px;
@@ -683,6 +728,7 @@ input:focus-visible {
 }
 
 .status-badge,
+.application-status,
 .deadline-badge {
   min-height: 26px;
   border-radius: 999px;
@@ -713,6 +759,26 @@ input:focus-visible {
 .status-지원불가 {
   color: var(--red);
   background: var(--red-soft);
+}
+
+.status-검토중 {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+
+.status-서류준비 {
+  color: var(--yellow);
+  background: var(--yellow-soft);
+}
+
+.status-작성중 {
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.status-제출완료 {
+  color: #5a6170;
+  background: #edf0f4;
 }
 
 .deadline-badge {
@@ -905,6 +971,70 @@ input:focus-visible {
   overflow-wrap: anywhere;
 }
 
+.application-panel {
+  border: 1px solid #b9d8cb;
+  border-radius: 8px;
+  padding: 14px;
+  display: grid;
+  gap: 12px;
+  background: #f7fcf9;
+}
+
+.application-panel-head,
+.application-next,
+.application-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.application-panel-head span,
+.application-next span,
+.application-summary span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.application-panel-head h3 {
+  margin: 3px 0 0;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.status-control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-control button,
+.application-next button,
+.reminder-row {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  background: #ffffff;
+}
+
+.status-control button.selected,
+.application-next button.selected,
+.reminder-row.selected {
+  color: #ffffff;
+  border-color: #17324d;
+  background: #17324d;
+}
+
+.application-next button {
+  flex: 0 0 auto;
+}
+
 .document-strip {
   border-top: 1px solid var(--line);
   padding-top: 14px;
@@ -953,6 +1083,20 @@ input:focus-visible {
   margin-bottom: 14px;
 }
 
+.application-summary {
+  min-height: 42px;
+  margin-bottom: 10px;
+}
+
+.compact-status {
+  margin-bottom: 12px;
+}
+
+.compact-status button {
+  min-height: 32px;
+  flex: 1 1 auto;
+}
+
 .checklist {
   display: grid;
   gap: 8px;
@@ -991,6 +1135,11 @@ input:focus-visible {
   background: #f4fbf7;
   color: var(--green);
   font-weight: 800;
+}
+
+.reminder-row {
+  width: 100%;
+  margin-top: 12px;
 }
 
 .profile-layout {
@@ -1574,6 +1723,13 @@ input:focus-visible {
 
   .review-item {
     grid-template-columns: 1fr;
+  }
+
+  .application-panel-head,
+  .application-next,
+  .application-summary {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .source-grid {
