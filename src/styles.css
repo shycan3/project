@@ -1352,6 +1352,115 @@ input:focus-visible {
   padding: 0 9px;
 }
 
+.document-vault-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.document-vault-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  display: grid;
+  gap: 13px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.document-vault-card.ready {
+  border-color: #b9d8cb;
+  background: #f7fcf9;
+}
+
+.document-vault-head,
+.document-progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.document-vault-head span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.document-vault-head h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.ready-toggle {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  color: var(--muted);
+  background: #ffffff;
+  white-space: nowrap;
+}
+
+.ready-toggle.ready {
+  color: #ffffff;
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.document-progress-row span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.document-progress-row strong {
+  color: var(--red);
+  font-size: 13px;
+}
+
+.document-required-list {
+  display: grid;
+  gap: 8px;
+}
+
+.document-required-list button {
+  min-height: 58px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  text-align: left;
+}
+
+.document-required-list button:hover {
+  border-color: #8db2dd;
+}
+
+.document-required-list strong,
+.document-required-list span {
+  display: block;
+}
+
+.document-required-list strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.document-required-list span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .saved-grid,
 .profile-layout,
 .admin-layout {
@@ -2010,7 +2119,8 @@ input:focus-visible {
   }
 
   .calendar-event,
-  .event-title-row {
+  .event-title-row,
+  .document-vault-grid {
     grid-template-columns: 1fr;
   }
 
@@ -2022,6 +2132,12 @@ input:focus-visible {
   .application-panel-head,
   .application-next,
   .application-summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .document-vault-head,
+  .document-progress-row {
     align-items: flex-start;
     flex-direction: column;
   }

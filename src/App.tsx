@@ -27,7 +27,7 @@ import {
   X
 } from "lucide-react";
 
-type ViewKey = "dashboard" | "recommendations" | "saved" | "calendar" | "profile" | "admin";
+type ViewKey = "dashboard" | "recommendations" | "saved" | "calendar" | "documents" | "profile" | "admin";
 type MatchStatus = "지원가능" | "조건부가능" | "확인필요" | "지원불가";
 type Category = "전체" | "장학금" | "생활비" | "주거비" | "교육/연수" | "공모전";
 type ApplicationStatus = "검토중" | "서류준비" | "작성중" | "제출완료";
@@ -90,6 +90,20 @@ type NotificationItem = {
   createdAt: string;
 };
 
+type DocumentVaultItem = {
+  name: string;
+  ready: boolean;
+  totalCount: number;
+  checkedCount: number;
+  dueSoonCount: number;
+  requiredBy: Array<{
+    id: string;
+    title: string;
+    dday: number;
+    category: Exclude<Category, "전체">;
+  }>;
+};
+
 type SourceItem = {
   id: string;
   name: string;
@@ -134,6 +148,7 @@ type BootstrapPayload = {
   checkedDocs: Record<string, string[]>;
   applications: Record<string, ApplicationPlan>;
   notifications: NotificationItem[];
+  documentVault: DocumentVaultItem[];
   admin: AdminData;
 };
 
@@ -534,6 +549,7 @@ function App() {
   const [checkedDocs, setCheckedDocs] = useState<Record<string, Set<string>>>({});
   const [applications, setApplications] = useState<Record<string, ApplicationPlan>>({});
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [documentVault, setDocumentVault] = useState<DocumentVaultItem[]>([]);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [admin, setAdmin] = useState<AdminData>(emptyAdmin);
@@ -547,6 +563,7 @@ function App() {
     setCheckedDocs(toCheckedDocSets(payload.checkedDocs));
     setApplications(payload.applications ?? {});
     setNotifications(payload.notifications ?? []);
+    setDocumentVault(payload.documentVault ?? []);
     setAdmin(payload.admin);
     if (!payload.opportunities.some((item) => item.id === selectedId) && payload.opportunities[0]) {
       setSelectedId(payload.opportunities[0].id);
@@ -689,6 +706,20 @@ function App() {
     }
   }
 
+  async function toggleDocumentReady(documentName: string, ready: boolean) {
+    setDocumentVault((current) => current.map((item) => (item.name === documentName ? { ...item, ready } : item)));
+    try {
+      const payload = await api<BootstrapPayload>(`/api/documents/${encodeURIComponent(documentName)}/ready`, {
+        method: "PATCH",
+        body: JSON.stringify({ ready })
+      });
+      applyBootstrap(payload);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "서류 보관함 저장 실패");
+      await loadBootstrap();
+    }
+  }
+
   async function saveProfile(nextProfile: Profile) {
     const normalizedProfile = normalizeProfileForUi(nextProfile);
     setProfile(normalizedProfile);
@@ -814,6 +845,7 @@ function App() {
           <NavItem icon={<Sparkles size={18} />} label="추천 기회" active={activeView === "recommendations"} onClick={() => setActiveView("recommendations")} />
           <NavItem icon={<Star size={18} />} label="저장/준비" active={activeView === "saved"} onClick={() => setActiveView("saved")} />
           <NavItem icon={<CalendarClock size={18} />} label="마감 캘린더" active={activeView === "calendar"} onClick={() => setActiveView("calendar")} />
+          <NavItem icon={<FileCheck2 size={18} />} label="서류 보관함" active={activeView === "documents"} onClick={() => setActiveView("documents")} />
           <NavItem icon={<UserRound size={18} />} label="내 프로필" active={activeView === "profile"} onClick={() => setActiveView("profile")} />
           <NavItem icon={<Database size={18} />} label="운영 검수" active={activeView === "admin"} onClick={() => setActiveView("admin")} />
         </nav>
@@ -927,6 +959,17 @@ function App() {
             applications={applications}
             onToggleSaved={toggleSaved}
             onUpdateApplication={updateApplicationProgress}
+            onOpenOpportunity={(id) => {
+              setSelectedId(id);
+              setActiveView("recommendations");
+            }}
+          />
+        )}
+
+        {activeView === "documents" && (
+          <DocumentVaultView
+            documents={documentVault}
+            onToggleReady={toggleDocumentReady}
             onOpenOpportunity={(id) => {
               setSelectedId(id);
               setActiveView("recommendations");
@@ -1599,6 +1642,80 @@ function CalendarView({
             </div>
           </div>
         ))}
+      </section>
+    </div>
+  );
+}
+
+function DocumentVaultView({
+  documents,
+  onToggleReady,
+  onOpenOpportunity
+}: {
+  documents: DocumentVaultItem[];
+  onToggleReady: (documentName: string, ready: boolean) => void;
+  onOpenOpportunity: (id: string) => void;
+}) {
+  const readyCount = documents.filter((item) => item.ready).length;
+  const dueSoonCount = documents.filter((item) => !item.ready && item.dueSoonCount > 0).length;
+  const sharedCount = documents.filter((item) => item.totalCount >= 2).length;
+  const totalRequirements = documents.reduce((sum, item) => sum + item.totalCount, 0);
+
+  if (documents.length === 0) {
+    return (
+      <div className="empty-state">
+        <FileCheck2 size={28} />
+        <h2>아직 관리할 서류가 없습니다</h2>
+        <p>기회를 저장하면 반복되는 신청 서류가 보관함에 자동으로 정리됩니다.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="content-stack">
+      <section className="metrics-grid" aria-label="서류 보관함 요약">
+        <MetricCard icon={<FileCheck2 size={20} />} label="준비된 서류" value={`${readyCount}/${documents.length}`} tone="green" />
+        <MetricCard icon={<AlertTriangle size={20} />} label="마감 임박 서류" value={`${dueSoonCount}개`} tone="red" />
+        <MetricCard icon={<ClipboardCheck size={20} />} label="공통 서류" value={`${sharedCount}개`} tone="blue" />
+        <MetricCard icon={<ListChecks size={20} />} label="총 요구 항목" value={`${totalRequirements}개`} tone="yellow" />
+      </section>
+
+      <section className="document-vault-grid">
+        {documents.map((document) => {
+          const progress = Math.round((document.checkedCount / document.totalCount) * 100);
+          return (
+            <article className={`document-vault-card ${document.ready ? "ready" : ""}`} key={document.name}>
+              <div className="document-vault-head">
+                <div>
+                  <span>{document.totalCount >= 2 ? "공통 서류" : "개별 서류"}</span>
+                  <h2>{document.name}</h2>
+                </div>
+                <button className={document.ready ? "ready-toggle ready" : "ready-toggle"} onClick={() => onToggleReady(document.name, !document.ready)}>
+                  {document.ready ? <Check size={17} /> : <FileCheck2 size={17} />}
+                  {document.ready ? "준비됨" : "준비 표시"}
+                </button>
+              </div>
+              <div className="document-progress-row">
+                <span>{document.checkedCount}/{document.totalCount}개 체크됨</span>
+                {document.dueSoonCount > 0 && <strong>D-7 내 {document.dueSoonCount}건</strong>}
+              </div>
+              <div className="mini-track" aria-label={`${document.name} 준비율 ${progress}%`}>
+                <div style={{ width: `${progress}%` }} />
+              </div>
+              <div className="document-required-list">
+                {document.requiredBy.map((item) => (
+                  <button key={item.id} onClick={() => onOpenOpportunity(item.id)}>
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{item.category}</span>
+                    </div>
+                    <DeadlineBadge dday={item.dday} />
+                  </button>
+                ))}
+              </div>
+            </article>
+          );
+        })}
       </section>
     </div>
   );
@@ -2308,6 +2425,7 @@ function viewTitle(view: ViewKey) {
     recommendations: "추천 기회",
     saved: "저장/신청 준비",
     calendar: "마감 캘린더",
+    documents: "서류 보관함",
     profile: "내 프로필",
     admin: "운영 검수"
   };

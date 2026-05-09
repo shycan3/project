@@ -90,6 +90,17 @@ async function route(req, res) {
     return sendJson(res, 200, buildBootstrap(db));
   }
 
+  const documentReadyMatch = url.pathname.match(/^\/api\/documents\/([^/]+)\/ready$/);
+  if (method === "PATCH" && documentReadyMatch) {
+    const documentName = decodeURIComponent(documentReadyMatch[1]);
+    const body = await readBody(req);
+    const db = await readDb();
+    updateDocumentReadiness(db, documentName, Boolean(body.ready));
+    db.auditLogs.unshift(audit("DOCUMENT_READY_UPDATED", { document: documentName, ready: Boolean(body.ready) }));
+    await writeDb(db);
+    return sendJson(res, 200, buildBootstrap(db));
+  }
+
   if (method === "POST" && url.pathname === "/api/saved-opportunities") {
     const body = await readBody(req);
     const db = await readDb();
@@ -143,6 +154,7 @@ async function route(req, res) {
       current.delete(body.document);
     }
     db.checkedDocs[opportunityId] = [...current];
+    syncDocumentVaultReady(db, body.document);
     application.updatedAt = new Date().toISOString();
     db.auditLogs.unshift(audit("CHECKLIST_UPDATED", { opportunityId, document: body.document, checked: body.checked }));
     await writeDb(db);
@@ -297,6 +309,7 @@ function buildBootstrap(db) {
 
   const pendingExtractions = db.extractionQueue.filter((item) => item.status === "PENDING");
   const notifications = buildNotifications(db, recommendations);
+  const documentVault = buildDocumentVault(db, recommendations);
 
   return {
     profile: db.profile,
@@ -305,6 +318,7 @@ function buildBootstrap(db) {
     checkedDocs: db.checkedDocs,
     applications: db.applications,
     notifications,
+    documentVault,
     admin: {
       todayCollected: 42 + db.opportunities.length,
       pendingReview: pendingExtractions.length,
@@ -414,6 +428,83 @@ function makeNotification(input) {
     priority: input.priority,
     createdAt: new Date().toISOString()
   };
+}
+
+function buildDocumentVault(db, recommendations) {
+  const savedIds = new Set(db.savedOpportunityIds ?? []);
+  const readySet = new Set(db.documentVaultReady ?? []);
+  const byDocument = new Map();
+
+  for (const opportunity of recommendations.filter((item) => savedIds.has(item.id))) {
+    for (const document of opportunity.documents) {
+      if (!byDocument.has(document)) {
+        byDocument.set(document, []);
+      }
+      byDocument.get(document).push({
+        id: opportunity.id,
+        title: opportunity.title,
+        dday: opportunity.dday,
+        category: opportunity.category
+      });
+    }
+  }
+
+  return [...byDocument.entries()]
+    .map(([name, requiredBy]) => {
+      const checkedCount = requiredBy.filter((item) => (db.checkedDocs?.[item.id] ?? []).includes(name)).length;
+      return {
+        name,
+        ready: readySet.has(name),
+        totalCount: requiredBy.length,
+        checkedCount,
+        dueSoonCount: requiredBy.filter((item) => item.dday <= 7).length,
+        requiredBy: requiredBy.sort((a, b) => a.dday - b.dday)
+      };
+    })
+    .sort((a, b) => Number(a.ready) - Number(b.ready) || b.dueSoonCount - a.dueSoonCount || b.totalCount - a.totalCount || a.name.localeCompare(b.name, "ko"));
+}
+
+function updateDocumentReadiness(db, documentName, ready) {
+  db.documentVaultReady = db.documentVaultReady ?? [];
+  const readySet = new Set(db.documentVaultReady);
+  const savedIds = new Set(db.savedOpportunityIds ?? []);
+  const affectedOpportunities = db.opportunities.filter((opportunity) => savedIds.has(opportunity.id) && opportunity.documents.includes(documentName));
+
+  if (ready) {
+    readySet.add(documentName);
+  } else {
+    readySet.delete(documentName);
+  }
+
+  for (const opportunity of affectedOpportunities) {
+    const docs = new Set(db.checkedDocs?.[opportunity.id] ?? []);
+    if (ready) {
+      docs.add(documentName);
+    } else {
+      docs.delete(documentName);
+    }
+    db.checkedDocs[opportunity.id] = [...docs];
+    ensureApplication(db, opportunity.id).updatedAt = new Date().toISOString();
+  }
+
+  db.documentVaultReady = [...readySet];
+}
+
+function syncDocumentVaultReady(db, documentName) {
+  db.documentVaultReady = db.documentVaultReady ?? [];
+  const readySet = new Set(db.documentVaultReady);
+  const savedIds = new Set(db.savedOpportunityIds ?? []);
+  const requiredOpportunities = db.opportunities.filter((opportunity) => savedIds.has(opportunity.id) && opportunity.documents.includes(documentName));
+
+  if (requiredOpportunities.length === 0) {
+    readySet.delete(documentName);
+  } else if (requiredOpportunities.every((opportunity) => (db.checkedDocs?.[opportunity.id] ?? []).includes(documentName))) {
+    readySet.add(documentName);
+  } else {
+    readySet.delete(documentName);
+  }
+
+  db.documentVaultReady = [...readySet];
 }
 
 function ensureApplication(db, opportunityId) {
@@ -1135,6 +1226,7 @@ function normalizeDb(db) {
     extractionQueue: db.extractionQueue ?? seedData.extractionQueue,
     savedOpportunityIds: db.savedOpportunityIds ?? [],
     checkedDocs: db.checkedDocs ?? {},
+    documentVaultReady: db.documentVaultReady ?? seedData.documentVaultReady ?? [],
     applications: {
       ...(seedData.applications ?? {}),
       ...(db.applications ?? {})

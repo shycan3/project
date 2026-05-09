@@ -22,6 +22,7 @@ export const seedData = {
   checkedDocs: {
     "opp-001": ["재학증명서"]
   },
+  documentVaultReady: ["재학증명서"],
   applications: {
     "opp-001": {
       status: "서류준비",

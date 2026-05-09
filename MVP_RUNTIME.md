@@ -41,6 +41,7 @@ npm run dev
 - 마감 알림 on/off와 다음 행동 추천
 - 대시보드 이번 주 신청 플랜
 - 마감 캘린더: 7일, 14일, 30일 구간별 일정 관리
+- 공통 서류 보관함: 반복 서류를 한 번 준비하면 관련 저장 공고 체크리스트에 일괄 반영
 - 상단 알림센터: 마감 임박, 남은 서류, 알림 예약, 신규 고득점 추천, 운영 검수 대기
 - 알림 읽음/전체 읽음 처리
 - 운영자 AI 추출 검수 큐
@@ -62,6 +63,7 @@ PATCH  /api/me/profile
 POST   /api/recommendations/recalculate
 PATCH  /api/notifications/:notificationId/read
 POST   /api/notifications/read-all
+PATCH  /api/documents/:documentName/ready
 POST   /api/saved-opportunities
 DELETE /api/saved-opportunities/:id
 PATCH  /api/applications/:opportunityId/progress
@@ -97,6 +99,15 @@ scripts/
 프론트엔드는 체크된 서류와 신청 상태를 합쳐 다음 행동을 계산한다. 예를 들어 미체크 서류가 있으면 해당 서류 준비를 우선 노출하고, 서류가 모두 준비되면 신청서 작성 또는 제출물 최종 점검을 안내한다.
 
 저장한 기회와 고득점 추천은 마감 캘린더에 표시된다. 캘린더는 7일 내 마감, 8~14일, 15~30일, 30일 이후 저장 기회로 나누어 보여주며, 각 일정에서 상세 보기, 저장, 알림 on/off, 신청 상태 변경을 바로 처리할 수 있다.
+
+## 서류 보관함
+
+저장한 기회에서 요구하는 서류는 `documentVault`로 자동 집계된다. 같은 서류가 여러 공고에서 반복되면 공통 서류로 표시한다.
+
+- `documentVaultReady`: 사용자가 준비 완료로 표시한 공통 서류 목록
+- 보관함에서 준비됨 처리: 해당 서류를 요구하는 모든 저장 공고의 체크리스트에 일괄 체크
+- 보관함에서 준비 해제: 해당 서류를 요구하는 저장 공고 체크리스트에서 일괄 해제
+- 개별 체크리스트 변경: 같은 서류가 필요한 저장 공고가 모두 체크되면 보관함도 준비됨으로 동기화
 
 ## 알림센터
 
