@@ -109,6 +109,8 @@ scripts/
 - 보관함에서 준비 해제: 해당 서류를 요구하는 저장 공고 체크리스트에서 일괄 해제
 - 개별 체크리스트 변경: 같은 서류가 필요한 저장 공고가 모두 체크되면 보관함도 준비됨으로 동기화
 
+현재 보관함은 실행형 MVP의 편의 기능이다. 실서비스 전환 시에는 서류 발급일, 만료일, 발급기관, 파일 해시, 공고별 유효기간 조건을 포함하는 `documents` / `document_versions` / `application_documents` 구조로 확장해야 한다. 상세 로드맵은 `ARCHITECTURE_ROADMAP.md`를 기준으로 한다.
+
 ## 알림센터
 
 알림은 저장 공고와 추천 결과를 바탕으로 서버에서 계산한다.
@@ -134,11 +136,17 @@ scripts/
 
 ## 다음 확장 우선순위
 
-1. PostgreSQL/Prisma로 파일 DB 교체
-2. 실제 인증 추가: 카카오/네이버 OAuth
-3. 공모전 공식 URL 등록/검수 화면 고도화
-4. 공고 수집 워커 분리
-5. Gemini 기반 PDF/HWP/이미지 추출 파이프라인 연결
-6. 추천 룰을 DB 스키마로 분리
-7. 이메일/웹푸시 알림 발송
-8. 관리자 권한/감사로그 강화
+실서비스 전환 로드맵은 `ARCHITECTURE_ROADMAP.md`를 따른다. 다음 개발은 기능 수를 늘리기보다 데이터 신뢰성, 추천 판정 정확성, 서류/규칙 버전 관리, 스냅샷, stale 처리, 알림 피로도 제어를 우선한다.
+
+1. 공고 원문 URL, 출처, 마지막 확인일, 검수 상태 필드 추가
+2. 추천 상세에 원문 확인 안내와 출처 신뢰도 표시
+3. 추천 로직에서 Hard Rule과 Soft Score 분리
+4. `match_score`와 `confidence_score` 분리
+5. 공통 서류 보관함을 document version 구조로 개편
+6. eligibility rule version과 recommendation snapshot 추가
+7. rule/profile/source 변경 시 stale 처리
+8. 이벤트/job 기반 우선순위 재계산 도입
+9. notification candidate와 알림 피로도 정책 도입
+10. Evidence-grounded AI 작성 도우미 추가
+11. PostgreSQL 또는 Supabase 전환
+12. 로그인/OAuth 및 RBAC 적용
