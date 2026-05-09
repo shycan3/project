@@ -77,6 +77,19 @@ type AuditLog = {
   createdAt: string;
 };
 
+type NotificationItem = {
+  id: string;
+  type: "deadline" | "document" | "reminder" | "match" | "admin";
+  tone: "red" | "yellow" | "blue" | "green";
+  title: string;
+  message: string;
+  opportunityId: string | null;
+  actionView: ViewKey;
+  read: boolean;
+  priority: number;
+  createdAt: string;
+};
+
 type SourceItem = {
   id: string;
   name: string;
@@ -120,6 +133,7 @@ type BootstrapPayload = {
   savedOpportunityIds: string[];
   checkedDocs: Record<string, string[]>;
   applications: Record<string, ApplicationPlan>;
+  notifications: NotificationItem[];
   admin: AdminData;
 };
 
@@ -519,6 +533,8 @@ function App() {
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
   const [checkedDocs, setCheckedDocs] = useState<Record<string, Set<string>>>({});
   const [applications, setApplications] = useState<Record<string, ApplicationPlan>>({});
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationOpen, setNotificationOpen] = useState(false);
   const [profile, setProfile] = useState<Profile>(initialProfile);
   const [admin, setAdmin] = useState<AdminData>(emptyAdmin);
   const [loading, setLoading] = useState(true);
@@ -530,6 +546,7 @@ function App() {
     setSavedIds(new Set(payload.savedOpportunityIds));
     setCheckedDocs(toCheckedDocSets(payload.checkedDocs));
     setApplications(payload.applications ?? {});
+    setNotifications(payload.notifications ?? []);
     setAdmin(payload.admin);
     if (!payload.opportunities.some((item) => item.id === selectedId) && payload.opportunities[0]) {
       setSelectedId(payload.opportunities[0].id);
@@ -585,6 +602,7 @@ function App() {
   const estimatedAmount = supportOpportunities.reduce((sum, item) => sum + item.amountMax, 0);
   const contestPrizePool = contestOpportunities.reduce((sum, item) => sum + item.amountMax, 0);
   const urgentCount = actionableOpportunities.filter((item) => item.dday <= 7).length;
+  const unreadNotificationCount = notifications.filter((item) => !item.read).length;
 
   async function toggleSaved(id: string) {
     const saved = savedIds.has(id);
@@ -724,6 +742,37 @@ function App() {
     }
   }
 
+  async function markNotificationRead(notificationId: string) {
+    setNotifications((current) => current.map((item) => (item.id === notificationId ? { ...item, read: true } : item)));
+    try {
+      const payload = await api<BootstrapPayload>(`/api/notifications/${notificationId}/read`, { method: "PATCH" });
+      applyBootstrap(payload);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "알림 읽음 처리 실패");
+      await loadBootstrap();
+    }
+  }
+
+  async function markAllNotificationsRead() {
+    setNotifications((current) => current.map((item) => ({ ...item, read: true })));
+    try {
+      const payload = await api<BootstrapPayload>("/api/notifications/read-all", { method: "POST" });
+      applyBootstrap(payload);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "알림 전체 읽음 처리 실패");
+      await loadBootstrap();
+    }
+  }
+
+  async function openNotification(notification: NotificationItem) {
+    await markNotificationRead(notification.id);
+    if (notification.opportunityId) {
+      setSelectedId(notification.opportunityId);
+    }
+    setActiveView(notification.actionView);
+    setNotificationOpen(false);
+  }
+
   if (loading) {
     return (
       <div className="boot-screen">
@@ -791,10 +840,19 @@ function App() {
             <h1>{viewTitle(activeView)}</h1>
           </div>
           <div className="topbar-actions">
-            <button className="icon-button" aria-label="알림">
-              <Bell size={19} />
-              <span className="dot" />
-            </button>
+            <div className="notification-wrapper">
+              <button className="icon-button" aria-label="알림" onClick={() => setNotificationOpen((current) => !current)}>
+                <Bell size={19} />
+                {unreadNotificationCount > 0 && <span className="notification-count">{unreadNotificationCount}</span>}
+              </button>
+              {notificationOpen && (
+                <NotificationCenter
+                  notifications={notifications}
+                  onOpen={(notification) => void openNotification(notification)}
+                  onMarkAllRead={() => void markAllNotificationsRead()}
+                />
+              )}
+            </div>
             <button className="icon-button" aria-label="설정">
               <Settings size={19} />
             </button>
@@ -1051,6 +1109,62 @@ function MetricCard({
       {caption && <small>{caption}</small>}
     </article>
   );
+}
+
+function NotificationCenter({
+  notifications,
+  onOpen,
+  onMarkAllRead
+}: {
+  notifications: NotificationItem[];
+  onOpen: (notification: NotificationItem) => void;
+  onMarkAllRead: () => void;
+}) {
+  const unreadCount = notifications.filter((item) => !item.read).length;
+
+  return (
+    <section className="notification-panel" aria-label="알림센터">
+      <div className="notification-head">
+        <div>
+          <span>알림센터</span>
+          <strong>{unreadCount > 0 ? `${unreadCount}개 미확인` : "모두 확인됨"}</strong>
+        </div>
+        <button onClick={onMarkAllRead} disabled={unreadCount === 0}>
+          모두 읽음
+        </button>
+      </div>
+      <div className="notification-list">
+        {notifications.map((notification) => (
+          <button className={`notification-item tone-${notification.tone} ${notification.read ? "read" : ""}`} key={notification.id} onClick={() => onOpen(notification)}>
+            <div className="notification-icon">{notificationIcon(notification.type)}</div>
+            <div>
+              <strong>{notification.title}</strong>
+              <span>{notification.message}</span>
+            </div>
+            {!notification.read && <i aria-label="미확인" />}
+          </button>
+        ))}
+        {notifications.length === 0 && (
+          <div className="notification-empty">
+            <Bell size={22} />
+            <strong>아직 알림이 없습니다</strong>
+            <span>저장한 기회와 신청 상태에 따라 알림이 생성됩니다.</span>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function notificationIcon(type: NotificationItem["type"]) {
+  const icons: Record<NotificationItem["type"], React.ReactNode> = {
+    deadline: <CalendarClock size={17} />,
+    document: <FileCheck2 size={17} />,
+    reminder: <Bell size={17} />,
+    match: <Sparkles size={17} />,
+    admin: <Database size={17} />
+  };
+  return icons[type];
 }
 
 function RecommendationsView({
@@ -2079,6 +2193,8 @@ function actionLabel(action: string) {
     OPPORTUNITY_SAVED: "공고 저장",
     OPPORTUNITY_UNSAVED: "공고 저장 해제",
     APPLICATION_PROGRESS_UPDATED: "신청 상태 업데이트",
+    NOTIFICATION_READ: "알림 읽음",
+    NOTIFICATIONS_READ_ALL: "알림 전체 읽음",
     CHECKLIST_UPDATED: "체크리스트 업데이트",
     EXTRACTION_APPROVED: "AI 추출 승인",
     EXTRACTION_REJECTED: "AI 추출 반려",

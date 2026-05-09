@@ -65,6 +65,31 @@ async function route(req, res) {
     return sendJson(res, 200, buildBootstrap(db));
   }
 
+  const notificationReadMatch = url.pathname.match(/^\/api\/notifications\/([^/]+)\/read$/);
+  if (method === "PATCH" && notificationReadMatch) {
+    const notificationId = decodeURIComponent(notificationReadMatch[1]);
+    const db = await readDb();
+    db.readNotificationIds = [...new Set([...(db.readNotificationIds ?? []), notificationId])];
+    db.auditLogs.unshift(audit("NOTIFICATION_READ", { notificationId }));
+    await writeDb(db);
+    return sendJson(res, 200, buildBootstrap(db));
+  }
+
+  if (method === "POST" && url.pathname === "/api/notifications/read-all") {
+    const db = await readDb();
+    const recommendations = db.opportunities
+      .map((opportunity) => ({
+        ...opportunity,
+        ...matchOpportunity(db.profile, opportunity)
+      }))
+      .sort((a, b) => b.matchScore - a.matchScore);
+    const notificationIds = buildNotifications(db, recommendations).map((item) => item.id);
+    db.readNotificationIds = [...new Set([...(db.readNotificationIds ?? []), ...notificationIds])];
+    db.auditLogs.unshift(audit("NOTIFICATIONS_READ_ALL", { count: notificationIds.length }));
+    await writeDb(db);
+    return sendJson(res, 200, buildBootstrap(db));
+  }
+
   if (method === "POST" && url.pathname === "/api/saved-opportunities") {
     const body = await readBody(req);
     const db = await readDb();
@@ -271,6 +296,7 @@ function buildBootstrap(db) {
     .sort((a, b) => b.matchScore - a.matchScore);
 
   const pendingExtractions = db.extractionQueue.filter((item) => item.status === "PENDING");
+  const notifications = buildNotifications(db, recommendations);
 
   return {
     profile: db.profile,
@@ -278,6 +304,7 @@ function buildBootstrap(db) {
     savedOpportunityIds: db.savedOpportunityIds,
     checkedDocs: db.checkedDocs,
     applications: db.applications,
+    notifications,
     admin: {
       todayCollected: 42 + db.opportunities.length,
       pendingReview: pendingExtractions.length,
@@ -288,6 +315,101 @@ function buildBootstrap(db) {
       crawlRuns: db.crawlRuns.slice(0, 10),
       auditLogs: db.auditLogs.slice(0, 8)
     }
+  };
+}
+
+function buildNotifications(db, recommendations) {
+  const readIds = new Set(db.readNotificationIds ?? []);
+  const savedIds = new Set(db.savedOpportunityIds ?? []);
+  const notifications = [];
+
+  for (const opportunity of recommendations.filter((item) => savedIds.has(item.id))) {
+    const application = db.applications?.[opportunity.id] ?? { status: "검토중", reminderEnabled: false };
+    const checked = new Set(db.checkedDocs?.[opportunity.id] ?? []);
+    const missingDocs = opportunity.documents.filter((document) => !checked.has(document));
+
+    if (application.status !== "제출완료" && opportunity.dday <= 7) {
+      notifications.push(makeNotification({
+        id: `deadline-${opportunity.id}`,
+        type: "deadline",
+        tone: "red",
+        title: `D-${opportunity.dday} 마감 임박`,
+        message: `${opportunity.title} 신청 마감이 가까워졌습니다.`,
+        opportunityId: opportunity.id,
+        read: readIds.has(`deadline-${opportunity.id}`),
+        priority: 100 - opportunity.dday
+      }));
+    }
+
+    if (application.status !== "제출완료" && missingDocs.length > 0) {
+      notifications.push(makeNotification({
+        id: `docs-${opportunity.id}`,
+        type: "document",
+        tone: "yellow",
+        title: `서류 ${missingDocs.length}개 남음`,
+        message: `${missingDocs[0]}부터 준비하면 신청 가능성이 올라갑니다.`,
+        opportunityId: opportunity.id,
+        read: readIds.has(`docs-${opportunity.id}`),
+        priority: 75 - Math.min(opportunity.dday, 30)
+      }));
+    }
+
+    if (application.reminderEnabled && application.status !== "제출완료") {
+      notifications.push(makeNotification({
+        id: `reminder-${opportunity.id}`,
+        type: "reminder",
+        tone: "blue",
+        title: "마감 알림 예약됨",
+        message: `${opportunity.title}의 D-${opportunity.dday} 알림이 켜져 있습니다.`,
+        opportunityId: opportunity.id,
+        read: readIds.has(`reminder-${opportunity.id}`),
+        priority: 45 - Math.min(opportunity.dday, 30)
+      }));
+    }
+  }
+
+  for (const opportunity of recommendations.filter((item) => !savedIds.has(item.id) && item.status !== "지원불가" && item.matchScore >= 86).slice(0, 2)) {
+    notifications.push(makeNotification({
+      id: `match-${opportunity.id}`,
+      type: "match",
+      tone: "green",
+      title: `매칭 ${opportunity.matchScore}% 추천`,
+      message: `${opportunity.title}이 현재 프로필과 잘 맞습니다.`,
+      opportunityId: opportunity.id,
+      read: readIds.has(`match-${opportunity.id}`),
+      priority: opportunity.matchScore
+    }));
+  }
+
+  const pendingExtractions = db.extractionQueue.filter((item) => item.status === "PENDING").length;
+  if (pendingExtractions > 0) {
+    notifications.push(makeNotification({
+      id: "admin-review-pending",
+      type: "admin",
+      tone: "blue",
+      title: `검수 대기 ${pendingExtractions}건`,
+      message: "운영 검수에서 수집 후보를 승인하면 추천 풀이 확장됩니다.",
+      actionView: "admin",
+      read: readIds.has("admin-review-pending"),
+      priority: 30
+    }));
+  }
+
+  return notifications.sort((a, b) => Number(a.read) - Number(b.read) || b.priority - a.priority).slice(0, 12);
+}
+
+function makeNotification(input) {
+  return {
+    id: input.id,
+    type: input.type,
+    tone: input.tone,
+    title: input.title,
+    message: input.message,
+    opportunityId: input.opportunityId ?? null,
+    actionView: input.actionView ?? "recommendations",
+    read: input.read,
+    priority: input.priority,
+    createdAt: new Date().toISOString()
   };
 }
 
@@ -1014,6 +1136,7 @@ function normalizeDb(db) {
       ...(seedData.applications ?? {}),
       ...(db.applications ?? {})
     },
+    readNotificationIds: db.readNotificationIds ?? seedData.readNotificationIds ?? [],
     auditLogs: db.auditLogs ?? []
   };
 }

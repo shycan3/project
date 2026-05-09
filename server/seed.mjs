@@ -34,6 +34,7 @@ export const seedData = {
       updatedAt: null
     }
   },
+  readNotificationIds: [],
   sources: [
     {
       id: "src-youthcenter",

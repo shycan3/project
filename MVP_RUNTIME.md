@@ -40,6 +40,8 @@ npm run dev
 - 저장 공고 신청 상태 관리: 검토중, 서류준비, 작성중, 제출완료
 - 마감 알림 on/off와 다음 행동 추천
 - 대시보드 이번 주 신청 플랜
+- 상단 알림센터: 마감 임박, 남은 서류, 알림 예약, 신규 고득점 추천, 운영 검수 대기
+- 알림 읽음/전체 읽음 처리
 - 운영자 AI 추출 검수 큐
 - 운영자 실제 데이터 소스 관리
 - 공개 HTML 소스 수집 실행
@@ -57,6 +59,8 @@ GET    /api/health
 GET    /api/bootstrap
 PATCH  /api/me/profile
 POST   /api/recommendations/recalculate
+PATCH  /api/notifications/:notificationId/read
+POST   /api/notifications/read-all
 POST   /api/saved-opportunities
 DELETE /api/saved-opportunities/:id
 PATCH  /api/applications/:opportunityId/progress
@@ -90,6 +94,18 @@ scripts/
 - `updatedAt`: 마지막 변경 시각
 
 프론트엔드는 체크된 서류와 신청 상태를 합쳐 다음 행동을 계산한다. 예를 들어 미체크 서류가 있으면 해당 서류 준비를 우선 노출하고, 서류가 모두 준비되면 신청서 작성 또는 제출물 최종 점검을 안내한다.
+
+## 알림센터
+
+알림은 저장 공고와 추천 결과를 바탕으로 서버에서 계산한다.
+
+- D-7 이하 저장 공고: 마감 임박 알림
+- 미체크 서류가 남은 저장 공고: 서류 준비 알림
+- 마감 알림을 켠 저장 공고: 알림 예약 상태
+- 매칭 점수 86점 이상 미저장 공고: 신규 추천 알림
+- 운영 검수 대기 공고: 관리자 알림
+
+읽음 상태는 `readNotificationIds`에 저장한다. 알림 본문은 추천/신청 상태에서 재계산되지만, ID는 공고 기준으로 안정적으로 유지해 읽음 처리가 사라지지 않도록 설계했다.
 
 ## 실제 수집 동작
 
