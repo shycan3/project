@@ -1237,6 +1237,121 @@ input:focus-visible {
   flex: 1 1 0;
 }
 
+.calendar-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.calendar-lane {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.lane-count {
+  min-width: 34px;
+  min-height: 30px;
+  border-radius: 999px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--blue);
+  background: var(--blue-soft);
+  font-weight: 900;
+}
+
+.calendar-event-list {
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-event {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 12px;
+  background: #fbfcfd;
+}
+
+.calendar-event.saved-event {
+  border-color: #c7d8eb;
+  background: #f7faff;
+}
+
+.calendar-event-date {
+  display: grid;
+  align-content: start;
+  justify-items: start;
+  gap: 8px;
+}
+
+.calendar-event-date span:last-child {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.calendar-event-main {
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.event-title-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+
+.event-title-row span,
+.event-title-row p,
+.event-next-action span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.event-title-row h3 {
+  margin: 4px 0;
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+.event-title-row p {
+  margin: 0;
+}
+
+.event-next-action {
+  display: grid;
+  gap: 6px;
+}
+
+.calendar-event-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.selected-action {
+  color: var(--blue);
+  border-color: #8db2dd;
+  background: var(--blue-soft);
+}
+
+.inline-status {
+  flex: 1 1 300px;
+}
+
+.inline-status button {
+  min-height: 34px;
+  flex: 1 1 auto;
+  padding: 0 9px;
+}
+
 .saved-grid,
 .profile-layout,
 .admin-layout {
@@ -1892,6 +2007,16 @@ input:focus-visible {
 
   .review-item {
     grid-template-columns: 1fr;
+  }
+
+  .calendar-event,
+  .event-title-row {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-event-date {
+    display: flex;
+    align-items: center;
   }
 
   .application-panel-head,

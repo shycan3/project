@@ -336,6 +336,7 @@ function buildNotifications(db, recommendations) {
         title: `D-${opportunity.dday} 마감 임박`,
         message: `${opportunity.title} 신청 마감이 가까워졌습니다.`,
         opportunityId: opportunity.id,
+        actionView: "calendar",
         read: readIds.has(`deadline-${opportunity.id}`),
         priority: 100 - opportunity.dday
       }));
@@ -349,6 +350,7 @@ function buildNotifications(db, recommendations) {
         title: `서류 ${missingDocs.length}개 남음`,
         message: `${missingDocs[0]}부터 준비하면 신청 가능성이 올라갑니다.`,
         opportunityId: opportunity.id,
+        actionView: "calendar",
         read: readIds.has(`docs-${opportunity.id}`),
         priority: 75 - Math.min(opportunity.dday, 30)
       }));
@@ -362,6 +364,7 @@ function buildNotifications(db, recommendations) {
         title: "마감 알림 예약됨",
         message: `${opportunity.title}의 D-${opportunity.dday} 알림이 켜져 있습니다.`,
         opportunityId: opportunity.id,
+        actionView: "calendar",
         read: readIds.has(`reminder-${opportunity.id}`),
         priority: 45 - Math.min(opportunity.dday, 30)
       }));

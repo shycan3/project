@@ -27,7 +27,7 @@ import {
   X
 } from "lucide-react";
 
-type ViewKey = "dashboard" | "recommendations" | "saved" | "profile" | "admin";
+type ViewKey = "dashboard" | "recommendations" | "saved" | "calendar" | "profile" | "admin";
 type MatchStatus = "지원가능" | "조건부가능" | "확인필요" | "지원불가";
 type Category = "전체" | "장학금" | "생활비" | "주거비" | "교육/연수" | "공모전";
 type ApplicationStatus = "검토중" | "서류준비" | "작성중" | "제출완료";
@@ -813,6 +813,7 @@ function App() {
           <NavItem icon={<LayoutDashboard size={18} />} label="대시보드" active={activeView === "dashboard"} onClick={() => setActiveView("dashboard")} />
           <NavItem icon={<Sparkles size={18} />} label="추천 기회" active={activeView === "recommendations"} onClick={() => setActiveView("recommendations")} />
           <NavItem icon={<Star size={18} />} label="저장/준비" active={activeView === "saved"} onClick={() => setActiveView("saved")} />
+          <NavItem icon={<CalendarClock size={18} />} label="마감 캘린더" active={activeView === "calendar"} onClick={() => setActiveView("calendar")} />
           <NavItem icon={<UserRound size={18} />} label="내 프로필" active={activeView === "profile"} onClick={() => setActiveView("profile")} />
           <NavItem icon={<Database size={18} />} label="운영 검수" active={activeView === "admin"} onClick={() => setActiveView("admin")} />
         </nav>
@@ -910,6 +911,21 @@ function App() {
             checkedDocs={checkedDocs}
             applications={applications}
             onToggleDocument={toggleDocument}
+            onUpdateApplication={updateApplicationProgress}
+            onOpenOpportunity={(id) => {
+              setSelectedId(id);
+              setActiveView("recommendations");
+            }}
+          />
+        )}
+
+        {activeView === "calendar" && (
+          <CalendarView
+            opportunities={opportunities}
+            savedIds={savedIds}
+            checkedDocs={checkedDocs}
+            applications={applications}
+            onToggleSaved={toggleSaved}
             onUpdateApplication={updateApplicationProgress}
             onOpenOpportunity={(id) => {
               setSelectedId(id);
@@ -1467,6 +1483,123 @@ function SavedView({
           </section>
         );
       })}
+    </div>
+  );
+}
+
+function CalendarView({
+  opportunities,
+  savedIds,
+  checkedDocs,
+  applications,
+  onToggleSaved,
+  onUpdateApplication,
+  onOpenOpportunity
+}: {
+  opportunities: Opportunity[];
+  savedIds: Set<string>;
+  checkedDocs: Record<string, Set<string>>;
+  applications: Record<string, ApplicationPlan>;
+  onToggleSaved: (id: string) => void;
+  onUpdateApplication: (opportunityId: string, patch: Partial<ApplicationPlan>) => void;
+  onOpenOpportunity: (id: string) => void;
+}) {
+  const actionable = opportunities
+    .filter((item) => item.status !== "지원불가")
+    .filter((item) => savedIds.has(item.id) || item.dday <= 30 || item.matchScore >= 82)
+    .sort((a, b) => a.dday - b.dday || b.matchScore - a.matchScore);
+  const savedItems = opportunities.filter((item) => savedIds.has(item.id));
+  const submittedCount = savedItems.filter((item) => (applications[item.id] ?? defaultApplicationPlan()).status === "제출완료").length;
+  const reminderCount = savedItems.filter((item) => (applications[item.id] ?? defaultApplicationPlan()).reminderEnabled).length;
+  const dueSoonCount = actionable.filter((item) => item.dday <= 7).length;
+  const lanes = [
+    { title: "7일 내 마감", helper: "오늘 바로 움직여야 하는 기회", items: actionable.filter((item) => item.dday <= 7) },
+    { title: "8~14일", helper: "서류 준비와 초안 작성 구간", items: actionable.filter((item) => item.dday > 7 && item.dday <= 14) },
+    { title: "15~30일", helper: "미리 저장하고 준비할 기회", items: actionable.filter((item) => item.dday > 14 && item.dday <= 30) },
+    { title: "30일 이후", helper: "장기 준비가 필요한 저장 기회", items: actionable.filter((item) => item.dday > 30 && savedIds.has(item.id)) }
+  ];
+
+  return (
+    <div className="content-stack">
+      <section className="metrics-grid" aria-label="마감 캘린더 요약">
+        <MetricCard icon={<CalendarClock size={20} />} label="7일 내 일정" value={`${dueSoonCount}개`} tone="red" />
+        <MetricCard icon={<Star size={20} />} label="저장한 기회" value={`${savedItems.length}개`} tone="yellow" />
+        <MetricCard icon={<Bell size={20} />} label="알림 설정" value={`${reminderCount}개`} tone="blue" />
+        <MetricCard icon={<Check size={20} />} label="제출 완료" value={`${submittedCount}개`} tone="green" />
+      </section>
+
+      <section className="calendar-layout">
+        {lanes.map((lane) => (
+          <div className="calendar-lane" key={lane.title}>
+            <div className="section-heading">
+              <div>
+                <p>{lane.helper}</p>
+                <h2>{lane.title}</h2>
+              </div>
+              <span className="lane-count">{lane.items.length}</span>
+            </div>
+            <div className="calendar-event-list">
+              {lane.items.map((item) => {
+                const saved = savedIds.has(item.id);
+                const application = applications[item.id] ?? defaultApplicationPlan();
+                const checked = checkedDocs[item.id] ?? new Set<string>();
+                const progress = Math.round((checked.size / item.documents.length) * 100);
+                return (
+                  <article className={`calendar-event ${saved ? "saved-event" : ""}`} key={item.id}>
+                    <div className="calendar-event-date">
+                      <DeadlineBadge dday={item.dday} />
+                      <span>{deadlineLabel(item.deadline)}</span>
+                    </div>
+                    <div className="calendar-event-main">
+                      <div className="event-title-row">
+                        <div>
+                          <span>{item.category} · 매칭 {item.matchScore}%</span>
+                          <h3>{item.title}</h3>
+                          <p>{item.organization} · {item.amountText}</p>
+                        </div>
+                        <ApplicationStatusBadge status={application.status} />
+                      </div>
+                      <div className="event-next-action">
+                        <span>{nextActionLabel(item, checked, application)}</span>
+                        <div className="mini-track" aria-label={`서류 준비율 ${progress}%`}>
+                          <div style={{ width: `${progress}%` }} />
+                        </div>
+                      </div>
+                      <div className="calendar-event-actions">
+                        <button className="secondary-button compact" onClick={() => onOpenOpportunity(item.id)}>
+                          <ChevronRight size={16} />
+                          상세
+                        </button>
+                        {saved ? (
+                          <>
+                            <button className={application.reminderEnabled ? "secondary-button compact selected-action" : "secondary-button compact"} onClick={() => onUpdateApplication(item.id, { reminderEnabled: !application.reminderEnabled })}>
+                              <Bell size={16} />
+                              {application.reminderEnabled ? "알림 켜짐" : "알림"}
+                            </button>
+                            <div className="status-control inline-status" aria-label={`${item.title} 신청 상태`}>
+                              {APPLICATION_STATUSES.map((status) => (
+                                <button key={status} className={application.status === status ? "selected" : ""} onClick={() => onUpdateApplication(item.id, { status })}>
+                                  {status}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        ) : (
+                          <button className="primary-button compact" onClick={() => onToggleSaved(item.id)}>
+                            <Star size={16} />
+                            저장
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+              {lane.items.length === 0 && <p className="muted-copy">해당 구간의 일정이 없습니다.</p>}
+            </div>
+          </div>
+        ))}
+      </section>
     </div>
   );
 }
@@ -2144,6 +2277,14 @@ function DeadlineBadge({ dday }: { dday: number }) {
   return <span className={`deadline-badge ${urgent ? "urgent" : ""}`}>D-{dday}</span>;
 }
 
+function deadlineLabel(deadline: string) {
+  if (!deadline || deadline.includes("확인")) {
+    return "기관 공고 확인";
+  }
+  const [date, time] = deadline.split(" ");
+  return time ? `${date.slice(5)} ${time}` : date;
+}
+
 function nextActionLabel(opportunity: Opportunity, checkedDocs: Set<string>, application: ApplicationPlan) {
   if (application.status === "제출완료") {
     return "제출 완료 기록됨";
@@ -2166,6 +2307,7 @@ function viewTitle(view: ViewKey) {
     dashboard: "매칭 대시보드",
     recommendations: "추천 기회",
     saved: "저장/신청 준비",
+    calendar: "마감 캘린더",
     profile: "내 프로필",
     admin: "운영 검수"
   };
